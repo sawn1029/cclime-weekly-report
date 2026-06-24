@@ -16,15 +16,17 @@ from urllib.parse import urlparse, parse_qs
 
 try:
     import config as _cfg
-    BASE_URL = _cfg.BASE_URL
-    EMAIL    = _cfg.EMAIL
-    PASSWORD = _cfg.PASSWORD
-    PORT     = _cfg.PORT
+    BASE_URL       = _cfg.BASE_URL
+    EMAIL          = _cfg.EMAIL
+    PASSWORD       = _cfg.PASSWORD
+    PORT           = _cfg.PORT
+    ADMIN_PASSWORD = getattr(_cfg, 'ADMIN_PASSWORD', PASSWORD)
 except ImportError:
-    BASE_URL = os.environ.get('BASE_URL', 'https://beautyrise-academy.vercel.app')
-    EMAIL    = os.environ.get('EMAIL', '')
-    PASSWORD = os.environ.get('PASSWORD', '')
-    PORT     = int(os.environ.get('PORT', '8081'))
+    BASE_URL       = os.environ.get('BASE_URL', 'https://beautyrise-academy.vercel.app')
+    EMAIL          = os.environ.get('EMAIL', '')
+    PASSWORD       = os.environ.get('PASSWORD', '')
+    PORT           = int(os.environ.get('PORT', '8081'))
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', PASSWORD)
 
 CACHE_TTL = 300
 COURSE_CACHE_TTL = 3600
@@ -956,6 +958,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/api/weekly':
             week_start = params.get('weekStart', [None])[0]
             self._serve_api(week_start)
+        elif path == '/api/irr_tasks':
+            data = _load_history()
+            self._json(data.get('irr_tasks', []))
         elif path == '/api/refresh':
             global _cache, _cache_ts, _courses_cache, _courses_cache_ts
             global _cancelled_cache, _cancelled_cache_ts, _course_stats_cache, _eval_cache, _eval_cache_ts
@@ -975,6 +980,43 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        length = int(self.headers.get('Content-Length', 0))
+        body = json.loads(self.rfile.read(length) or b'{}')
+
+        if path == '/api/irr_tasks':
+            if body.get('password') != ADMIN_PASSWORD:
+                self._json({'error': '비밀번호가 틀렸습니다'}, 403)
+                return
+            data = _load_history()
+            tasks = data.get('irr_tasks', [])
+            action = body.get('action')
+            if action == 'add':
+                tasks.append(body.get('task', {}))
+            elif action == 'update':
+                idx = body.get('idx', -1)
+                if 0 <= idx < len(tasks):
+                    tasks[idx][body.get('field')] = body.get('val')
+            elif action == 'delete':
+                idx = body.get('idx', -1)
+                if 0 <= idx < len(tasks):
+                    tasks.pop(idx)
+            data['irr_tasks'] = tasks
+            _save_history(data)
+            self._json({'ok': True, 'tasks': tasks})
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
 
     def _serve_file(self):
         try:

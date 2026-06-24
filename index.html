@@ -730,35 +730,58 @@ function toggleTaskDetail() {
 }
 
 // ══════════════════════════════════════════════
-// 비정기 주요업무 (localStorage)
+// 비정기 주요업무 (서버 저장 + 관리자 모드)
 // ══════════════════════════════════════════════
-const IRR_KEY    = 'cclime_irr_tasks';
 const IRR_STATUS = ['예정', '진행중', '완료', '보류'];
 const IRR_COLOR  = { 예정:'#1d4ed8', 진행중:'#d97706', 완료:'#16a34a', 보류:'#6b7280' };
 const IRR_BG     = { 예정:'#dbeafe', 진행중:'#fef3c7', 완료:'#dcfce7', 보류:'#f1f5f9' };
 
-function irrLoad() {
-  try { return JSON.parse(localStorage.getItem(IRR_KEY) || '[]'); } catch { return []; }
-}
-function irrSave(rows) { localStorage.setItem(IRR_KEY, JSON.stringify(rows)); }
+let _irrRows = [];
+let _irrAdmin = sessionStorage.getItem('irr_admin') || '';
 
-function irrUpdate(idx, field, val) {
-  const rows = irrLoad();
-  if (rows[idx]) { rows[idx][field] = val; irrSave(rows); }
-}
-function irrStatusChange(idx, val) { irrUpdate(idx, 'status', val); renderIrregular(); }
-function irrAdd() {
-  const rows = irrLoad();
-  rows.push({ name:'', content:'', period:'', status:'진행중', note:'' });
-  irrSave(rows);
+async function irrLoadFromServer() {
+  try {
+    const res = await fetch('/api/irr_tasks');
+    _irrRows = await res.json();
+  } catch { _irrRows = []; }
   renderIrregular();
 }
-function irrDel(idx) {
+
+async function irrPost(body) {
+  const res = await fetch('/api/irr_tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, password: _irrAdmin })
+  });
+  const data = await res.json();
+  if (res.status === 403) { alert('비밀번호가 틀렸습니다.'); _irrAdmin = ''; sessionStorage.removeItem('irr_admin'); renderIrregular(); return false; }
+  _irrRows = data.tasks || _irrRows;
+  renderIrregular();
+  return true;
+}
+
+function irrToggleAdmin() {
+  if (_irrAdmin) {
+    _irrAdmin = '';
+    sessionStorage.removeItem('irr_admin');
+    renderIrregular();
+  } else {
+    const pw = prompt('관리자 비밀번호를 입력하세요:');
+    if (pw === null) return;
+    _irrAdmin = pw;
+    sessionStorage.setItem('irr_admin', pw);
+    renderIrregular();
+  }
+}
+
+async function irrUpdate(idx, field, val) {
+  await irrPost({ action: 'update', idx, field, val });
+}
+async function irrStatusChange(idx, val) { await irrPost({ action: 'update', idx, field: 'status', val }); }
+async function irrAdd() { await irrPost({ action: 'add', task: { name:'', content:'', period:'', status:'진행중', note:'' } }); }
+async function irrDel(idx) {
   if (!confirm('이 항목을 삭제하시겠습니까?')) return;
-  const rows = irrLoad();
-  rows.splice(idx, 1);
-  irrSave(rows);
-  renderIrregular();
+  await irrPost({ action: 'delete', idx });
 }
 
 function esc(s) {
@@ -766,9 +789,10 @@ function esc(s) {
 }
 
 function renderIrregular() {
-  const rows = irrLoad();
+  const rows = _irrRows;
   const card = document.getElementById('irregularCard');
   if (!card) return;
+  const isAdmin = !!_irrAdmin;
 
   let html = `<div class="report-card">
     <div class="card-header">
@@ -777,11 +801,14 @@ function renderIrregular() {
         <div class="card-title-dot" style="background:#d97706"></div>
         비정기 주요업무
       </div>
+      <button onclick="irrToggleAdmin()" style="margin-left:auto;background:none;border:1px solid #cbd5e1;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px;color:${isAdmin?'#16a34a':'#64748b'}">
+        ${isAdmin ? '🔓 관리자 모드' : '🔒 잠금'}
+      </button>
     </div>
     <div class="card-body">`;
 
   if (!rows.length) {
-    html += `<div class="irr-empty">아래 버튼을 눌러 업무를 추가하세요</div>`;
+    html += `<div class="irr-empty">${isAdmin ? '아래 버튼을 눌러 업무를 추가하세요' : '등록된 업무가 없습니다'}</div>`;
   } else {
     html += `<div style="overflow-x:auto"><div class="irr-wrap"><table class="irr-table">
       <thead><tr>
@@ -790,37 +817,45 @@ function renderIrregular() {
         <th style="width:14%">기간</th>
         <th style="width:10%">상태</th>
         <th>비고</th>
-        <th style="width:50px;text-align:center"></th>
+        ${isAdmin ? '<th style="width:50px;text-align:center"></th>' : ''}
       </tr></thead>
       <tbody>`;
 
     rows.forEach((r, i) => {
       const sc = IRR_COLOR[r.status] || '#1a202c';
       const sb = IRR_BG[r.status]    || '#f1f5f9';
-      const opts = IRR_STATUS.map(s =>
-        `<option value="${s}"${s === r.status ? ' selected' : ''}>${s}</option>`
-      ).join('');
-      html += `<tr>
-        <td><input class="irr-input" value="${esc(r.name)}"    placeholder="업무명"    oninput="irrUpdate(${i},'name',this.value)"></td>
-        <td><input class="irr-input" value="${esc(r.content)}" placeholder="내용"      oninput="irrUpdate(${i},'content',this.value)"></td>
-        <td><input class="irr-input" value="${esc(r.period)}"  placeholder="예) 6/24~7/1" oninput="irrUpdate(${i},'period',this.value)"></td>
-        <td>
-          <select class="irr-status-sel" style="color:${sc};background:${sb};border-color:${sc}40"
-            onchange="irrStatusChange(${i},this.value)">
-            ${opts}
-          </select>
-        </td>
-        <td><input class="irr-input" value="${esc(r.note)}" placeholder="비고" oninput="irrUpdate(${i},'note',this.value)"></td>
-        <td style="text-align:center">
-          <button class="irr-del" onclick="irrDel(${i})">삭제</button>
-        </td>
-      </tr>`;
+      if (isAdmin) {
+        const opts = IRR_STATUS.map(s =>
+          `<option value="${s}"${s === r.status ? ' selected' : ''}>${s}</option>`
+        ).join('');
+        html += `<tr>
+          <td><input class="irr-input" value="${esc(r.name)}"    placeholder="업무명"    onchange="irrUpdate(${i},'name',this.value)"></td>
+          <td><input class="irr-input" value="${esc(r.content)}" placeholder="내용"      onchange="irrUpdate(${i},'content',this.value)"></td>
+          <td><input class="irr-input" value="${esc(r.period)}"  placeholder="예) 6/24~7/1" onchange="irrUpdate(${i},'period',this.value)"></td>
+          <td>
+            <select class="irr-status-sel" style="color:${sc};background:${sb};border-color:${sc}40"
+              onchange="irrStatusChange(${i},this.value)">
+              ${opts}
+            </select>
+          </td>
+          <td><input class="irr-input" value="${esc(r.note)}" placeholder="비고" onchange="irrUpdate(${i},'note',this.value)"></td>
+          <td style="text-align:center"><button class="irr-del" onclick="irrDel(${i})">삭제</button></td>
+        </tr>`;
+      } else {
+        html += `<tr>
+          <td>${esc(r.name)}</td>
+          <td>${esc(r.content)}</td>
+          <td>${esc(r.period)}</td>
+          <td><span style="color:${sc};background:${sb};border:1px solid ${sc}40;border-radius:4px;padding:2px 8px;font-size:12px">${esc(r.status)}</span></td>
+          <td>${esc(r.note)}</td>
+        </tr>`;
+      }
     });
 
     html += `</tbody></table></div></div>`;
   }
 
-  html += `<button class="btn-add-row" onclick="irrAdd()">＋ 업무 추가</button>`;
+  if (isAdmin) html += `<button class="btn-add-row" onclick="irrAdd()">＋ 업무 추가</button>`;
   html += `</div></div>`;
 
   card.innerHTML = html;
@@ -828,7 +863,7 @@ function renderIrregular() {
 
 // 초기화
 loadData();
-renderIrregular();
+irrLoadFromServer();
 setInterval(loadData, 5 * 60 * 1000);
 </script>
 </body>
