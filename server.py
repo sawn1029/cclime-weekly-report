@@ -14,12 +14,17 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime, timedelta, date
 from urllib.parse import urlparse, parse_qs
 
-import config as _cfg
-
-BASE_URL = _cfg.BASE_URL
-EMAIL    = _cfg.EMAIL
-PASSWORD = _cfg.PASSWORD
-PORT     = _cfg.PORT
+try:
+    import config as _cfg
+    BASE_URL = _cfg.BASE_URL
+    EMAIL    = _cfg.EMAIL
+    PASSWORD = _cfg.PASSWORD
+    PORT     = _cfg.PORT
+except ImportError:
+    BASE_URL = os.environ.get('BASE_URL', 'https://beautyrise-academy.vercel.app')
+    EMAIL    = os.environ.get('EMAIL', '')
+    PASSWORD = os.environ.get('PASSWORD', '')
+    PORT     = int(os.environ.get('PORT', '8081'))
 
 CACHE_TTL = 300
 COURSE_CACHE_TTL = 3600
@@ -29,9 +34,16 @@ _BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 HTML_PATH    = os.path.join(_BASE_DIR, 'index.html')
 HISTORY_FILE = os.path.join(_BASE_DIR, 'history.json')
 
-ROSTER_SHEET_ID     = _cfg.ROSTER_SHEET_ID
-ROSTER_ACTIVE_URL   = f'https://docs.google.com/spreadsheets/d/{ROSTER_SHEET_ID}/export?format=csv&gid={_cfg.ROSTER_ACTIVE_GID}'
-ROSTER_RESIGNED_URL = f'https://docs.google.com/spreadsheets/d/{ROSTER_SHEET_ID}/export?format=csv&gid={_cfg.ROSTER_RESIGNED_GID}'
+try:
+    ROSTER_SHEET_ID     = _cfg.ROSTER_SHEET_ID
+    _roster_active_gid  = _cfg.ROSTER_ACTIVE_GID
+    _roster_resigned_gid = _cfg.ROSTER_RESIGNED_GID
+except NameError:
+    ROSTER_SHEET_ID      = os.environ.get('ROSTER_SHEET_ID', '')
+    _roster_active_gid   = os.environ.get('ROSTER_ACTIVE_GID', '0')
+    _roster_resigned_gid = os.environ.get('ROSTER_RESIGNED_GID', '')
+ROSTER_ACTIVE_URL   = f'https://docs.google.com/spreadsheets/d/{ROSTER_SHEET_ID}/export?format=csv&gid={_roster_active_gid}'
+ROSTER_RESIGNED_URL = f'https://docs.google.com/spreadsheets/d/{ROSTER_SHEET_ID}/export?format=csv&gid={_roster_resigned_gid}'
 ROSTER_CACHE_TTL = 300
 
 EXCLUDE_TITLES = {'테스트입니다', '업로드 테스트', '액티브리페어', '윤곽관리'}
