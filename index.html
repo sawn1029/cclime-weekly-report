@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>끌리메 교육팀 주간현황보고</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #0d1117; color: #1a202c; min-height: 100vh; }
+
+/* ── 헤더 ── */
+.page-header {
+  background: #0d1117; padding: 12px 28px;
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  border-bottom: 1px solid #21262d;
+}
+.brand { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
+.brand span { color: #60a5fa; }
+.date-picker-wrap {
+  display: flex; align-items: center; gap: 6px;
+  background: #161b27; border: 1px solid #30363d; border-radius: 8px; padding: 5px 10px;
+}
+.date-picker-wrap label { font-size: 11px; color: #8b949e; white-space: nowrap; }
+.date-nav { background: transparent; border: none; color: #8b949e; cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1; }
+.date-nav:hover { color: #fff; }
+.date-input { background: transparent; border: none; color: #fff; font-size: 13px; font-weight: 700; width: 95px; outline: none; cursor: pointer; }
+.date-input::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; width: 13px; }
+.btn-today { background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700; }
+.btn-today:hover { color: #fff; background: #30363d; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.week-range-label { font-size: 12px; color: #8b949e; }
+.btn-refresh { background: #1d4ed8; border: none; color: white; padding: 7px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; transition: background 0.2s; }
+.btn-refresh:hover { background: #2563eb; }
+
+/* ── 지표 스트립 ── */
+.metrics-strip { background: #161b27; border-bottom: 1px solid #21262d; padding: 9px 28px; display: flex; align-items: center; gap: 0; flex-wrap: wrap; font-size: 12px; color: #8b949e; }
+.strip-group { display: flex; align-items: center; gap: 6px; padding: 0 16px; }
+.strip-group:first-child { padding-left: 0; }
+.strip-divider { width: 1px; height: 16px; background: #30363d; flex-shrink: 0; }
+.strip-label { color: #4b5563; font-weight: 600; white-space: nowrap; }
+.strip-item { white-space: nowrap; }
+.strip-item strong { color: #e2e8f0; font-weight: 800; }
+.strip-updated { margin-left: auto; font-size: 11px; color: #4b5563; }
+
+/* ── 메인 컨테이너 ── */
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+
+/* ── 리포트 카드 ── */
+.report-card { background: #fff; border-radius: 16px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 4px 32px rgba(0,0,0,0.4); }
+.card-header { padding: 14px 24px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
+.card-tag { font-size: 10px; font-weight: 800; padding: 3px 12px; border-radius: 20px; letter-spacing: 0.5px; white-space: nowrap; }
+.card-tag.weekly    { background: #dbeafe; color: #1d4ed8; }
+.card-tag.monthly   { background: #ede9fe; color: #7c3aed; }
+.card-tag.irregular { background: #fef3c7; color: #92400e; }
+.card-title { font-size: 15px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+.card-title-dot { width: 10px; height: 10px; border-radius: 50%; background: #1C3557; flex-shrink: 0; }
+.card-body { padding: 20px 24px; }
+
+/* ── 타일 ── */
+.tiles-sublabel { font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+.tiles-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.tile { border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 110px; display: flex; flex-direction: column; gap: 4px; }
+.tile-lbl { font-size: 10px; font-weight: 600; color: #64748b; letter-spacing: 0.3px; }
+.tile-val { font-size: 32px; font-weight: 900; line-height: 1.1; }
+.tile-sub { font-size: 10px; color: #94a3b8; }
+.tile.blue   { background: #eff6ff; } .tile.blue   .tile-val { color: #1e40af; }
+.tile.green  { background: #f0fdf4; } .tile.green  .tile-val { color: #166534; }
+.tile.gray   { background: #f8fafc; } .tile.gray   .tile-val { color: #334155; }
+.tile.purple { background: #faf5ff; } .tile.purple .tile-val { color: #6b21a8; }
+.tile.teal   { background: #f0fdfa; } .tile.teal   .tile-val { color: #0f766e; }
+
+/* ── 섹션 타이틀 ── */
+.section-label { font-size: 11px; font-weight: 700; color: #64748b; display: flex; align-items: center; gap: 6px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.section-label::before { content: ''; width: 3px; height: 13px; background: #E11D48; border-radius: 2px; flex-shrink: 0; }
+.sec-badge { background: #f1f5f9; color: #64748b; font-size: 10px; font-weight: 700; padding: 1px 8px; border-radius: 20px; }
+.sec-badge.hot { background: #fee2e2; color: #dc2626; }
+
+/* ── 교육 목록 ── */
+.course-list { border: 1px solid #e8ecf0; border-radius: 12px; overflow: hidden; }
+.course-list .empty { padding: 20px; text-align: center; color: #94a3b8; font-size: 13px; }
+.course-row { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid #f1f5f9; }
+.course-row:last-child { border-bottom: none; }
+.c-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.c-title { font-size: 13px; font-weight: 600; color: #1a202c; flex: 1; }
+.c-date  { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+.c-type  { font-size: 10px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+.c-stats { font-size: 11px; font-weight: 600; color: #1d4ed8; background: #eff6ff; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+.c-cancelled { text-decoration: line-through; color: #94a3b8 !important; }
+.badge-폐강 { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #fee2e2; color: #dc2626; flex-shrink: 0; }
+
+/* ── 과제 큰 지표 + 펼치기 ── */
+.task-big-row { display: flex; gap: 12px; margin-bottom: 10px; }
+.task-big-tile { flex: 1; border-radius: 12px; padding: 18px 20px; text-align: center; border: 1px solid #e8ecf0; }
+.task-big-tile .tb-num { font-size: 42px; font-weight: 900; line-height: 1.1; }
+.task-big-tile .tb-lbl { font-size: 12px; font-weight: 700; margin-top: 5px; }
+.task-big-tile.completed { background: #f0fdf4; border-color: #bbf7d0; }
+.task-big-tile.completed .tb-num { color: #16a34a; }
+.task-big-tile.completed .tb-lbl { color: #166534; }
+.task-big-tile.overdue { background: #fff5f5; border-color: #fecaca; }
+.task-big-tile.overdue .tb-num { color: #dc2626; }
+.task-big-tile.overdue .tb-lbl { color: #b91c1c; }
+.task-big-tile.pending { background: #fffbeb; border-color: #fde68a; }
+.task-big-tile.pending .tb-num { color: #d97706; }
+.task-big-tile.pending .tb-lbl { color: #92400e; }
+.btn-expand-task { width: 100%; padding: 9px; background: #f8fafc; border: 1px solid #e8ecf0; border-radius: 8px; color: #64748b; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.btn-expand-task:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+.task-detail-wrap { margin-top: 10px; }
+.task-list-wrap { border: 1px solid #e8ecf0; border-radius: 12px; overflow: hidden; }
+.task-item { padding: 10px 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer; user-select: none; }
+.task-item:last-child { border-bottom: none; }
+.task-item:hover { background: #fafbfc; }
+.task-row { display: flex; align-items: center; gap: 8px; }
+.t-status { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+.status-COMPLETED { background: #dcfce7; color: #16a34a; }
+.status-OVERDUE   { background: #fee2e2; color: #dc2626; }
+.status-PENDING   { background: #fef3c7; color: #d97706; }
+.t-title { font-size: 13px; font-weight: 600; flex: 1; }
+.t-due   { font-size: 11px; color: #94a3b8; flex-shrink: 0; }
+.t-arrow { font-size: 9px; color: #cbd5e1; transition: transform 0.2s; flex-shrink: 0; }
+.task-detail { max-height: 0; overflow: hidden; transition: max-height 0.2s ease, padding 0.2s ease; font-size: 11px; color: #64748b; }
+.task-item.expanded .task-detail { max-height: 60px; padding-top: 6px; }
+.task-item.expanded .t-arrow { transform: rotate(90deg); }
+.chip-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip { background: #f1f5f9; border-radius: 5px; padding: 1px 7px; font-size: 11px; color: #475569; }
+
+/* ── 월간 테이블 ── */
+.data-table { width: 100%; border-collapse: collapse; border: 1px solid #e8ecf0; border-radius: 12px; overflow: hidden; }
+.data-table thead th { background: #1C3557; color: white; padding: 10px 16px; font-size: 11px; font-weight: 700; text-align: center; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.data-table thead th:first-child { text-align: left; }
+.data-table tbody td { padding: 11px 16px; font-size: 13px; border-bottom: 1px solid #f1f5f9; text-align: center; vertical-align: middle; }
+.data-table tbody td:first-child { text-align: left; font-weight: 700; color: #1C3557; }
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:nth-child(even) td { background: #fafbfc; }
+.data-table tbody tr.current-row td { background: #eff6ff; }
+.data-table tbody tr.current-row td:first-child { color: #1d4ed8; }
+.month-chip { display: inline-block; background: #dbeafe; color: #1d4ed8; font-size: 10px; font-weight: 700; padding: 1px 8px; border-radius: 20px; margin-left: 6px; }
+.delta-chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; }
+.delta-chip.down { background: #dcfce7; color: #16a34a; }
+.delta-chip.up   { background: #fee2e2; color: #dc2626; }
+.delta-chip.none { background: #f1f5f9; color: #94a3b8; }
+.v-good { color: #16a34a; font-weight: 700; }
+.v-warn { color: #d97706; font-weight: 700; }
+.v-bad  { color: #dc2626; font-weight: 700; }
+.v-none { color: #cbd5e1; font-size: 12px; }
+.score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.score-bar-bg { flex: 1; height: 7px; background: #e8ecf0; border-radius: 4px; overflow: hidden; min-width: 60px; }
+.score-bar-fill { height: 100%; border-radius: 4px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.score-val { font-size: 13px; font-weight: 800; width: 44px; text-align: right; }
+.below70 { font-size: 10px; padding: 1px 7px; border-radius: 10px; background: #fee2e2; color: #dc2626; font-weight: 700; }
+
+/* ── 벨트 ── */
+.belt-chip { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 800; }
+.belt-화이트 { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+.belt-옐로우 { background: #fefce8; color: #854d0e; border: 1px solid #fef08a; }
+.belt-레드   { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
+.belt-블루   { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+.belt-실버   { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.belt-골드   { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+.belt-퍼플   { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+.belt-블랙   { background: #1e293b; color: #f8fafc; border: 1px solid #334155; }
+.prog-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.prog-chip { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 1px 7px; font-size: 11px; color: #475569; white-space: nowrap; }
+.prog-chip.top { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+
+/* ── 비정기 주요업무 ── */
+.irr-table { width: 100%; border-collapse: collapse; overflow: hidden; }
+.irr-table th { background: #1C3557; color: white; padding: 9px 14px; font-size: 11px; font-weight: 700; text-align: left; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.irr-table td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.irr-table tr:last-child td { border-bottom: none; }
+.irr-table tr:hover td { background: #fafbfc; }
+.irr-wrap { border: 1px solid #e8ecf0; border-radius: 12px; overflow: hidden; }
+.irr-input { width: 100%; border: none; background: transparent; font-family: inherit; font-size: 13px; color: #1a202c; outline: none; padding: 3px 4px; border-radius: 4px; }
+.irr-input:focus { background: #eff6ff; }
+.irr-input::placeholder { color: #cbd5e1; }
+.irr-status-sel { border: 1px solid #e8ecf0; border-radius: 6px; font-size: 11px; font-weight: 700; padding: 4px 6px; cursor: pointer; outline: none; font-family: inherit; width: 100%; }
+.irr-del { background: #fee2e2; border: none; border-radius: 6px; color: #dc2626; font-size: 11px; font-weight: 700; padding: 5px 10px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.irr-del:hover { background: #fca5a5; }
+.irr-empty { padding: 32px; text-align: center; color: #94a3b8; font-size: 13px; }
+.btn-add-row { margin-top: 10px; width: 100%; padding: 10px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; color: #64748b; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.btn-add-row:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+
+/* ── 공통 ── */
+.section-block { margin-bottom: 22px; }
+.section-block:last-child { margin-bottom: 0; }
+.loading { text-align: center; padding: 80px 20px; }
+.loading .spinner { width: 36px; height: 36px; border: 3px solid #21262d; border-top-color: #60a5fa; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+.loading p { color: #4b5563; font-size: 14px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-box { background: #450a0a; border: 1px solid #991b1b; border-radius: 12px; padding: 16px 20px; color: #fca5a5; font-size: 13px; }
+
+@media print {
+  body { background: white; }
+  .page-header { background: #1C3557 !important; print-color-adjust: exact; }
+  .metrics-strip { display: none; }
+  .report-card { box-shadow: none; border: 1px solid #e8ecf0; }
+  .btn-refresh, .date-nav, .btn-today, .btn-expand-task, .irr-del, .btn-add-row { display: none !important; }
+  #taskDetailWrap { display: block !important; }
+}
+@media (max-width: 700px) {
+  .tiles-row { flex-wrap: wrap; }
+  .tile { min-width: 44%; }
+  .tile-val { font-size: 26px; }
+  .metrics-strip { display: none; }
+  .task-big-row { gap: 8px; }
+  .task-big-tile .tb-num { font-size: 30px; }
+  .data-table { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="brand">끌리메 <span>·</span> 교육팀</div>
+  <div class="date-picker-wrap">
+    <label>기준 주간</label>
+    <button class="date-nav" onclick="moveWeek(-1)">‹</button>
+    <input type="date" class="date-input" id="datePicker" onchange="onDatePick()">
+    <button class="date-nav" onclick="moveWeek(1)">›</button>
+  </div>
+  <button class="btn-today" onclick="goToday()">오늘</button>
+  <div class="header-right">
+    <span class="week-range-label" id="weekLabel">-</span>
+    <button class="btn-refresh" onclick="refresh()">↻ 새로고침</button>
+  </div>
+</div>
+
+<div class="metrics-strip" id="metricsStrip">
+  <span style="color:#4b5563">불러오는 중...</span>
+</div>
+
+<div class="container">
+  <div id="mainContent">
+    <div class="loading"><div class="spinner"></div><p>데이터를 가져오는 중입니다...</p></div>
+  </div>
+  <div id="irregularCard"></div>
+</div>
+
+<script>
+let currentWeekStart = getWeekStart(new Date());
+let _taskExpanded = false;
+
+function getWeekStart(d) {
+  const day = new Date(d);
+  const dow = day.getDay();
+  day.setDate(day.getDate() + (dow === 0 ? -6 : 1 - dow));
+  day.setHours(0,0,0,0);
+  return day;
+}
+function toISO(d) { return d.toISOString().split('T')[0]; }
+
+function weekRangeLabel(ws) {
+  const we = new Date(ws); we.setDate(we.getDate() + 6);
+  const thisWs = getWeekStart(new Date());
+  let tag = '';
+  if (toISO(ws) === toISO(thisWs)) tag = ' · 이번 주';
+  else if (toISO(ws) === toISO(new Date(thisWs.getTime() + 7*864e5))) tag = ' · 다음 주';
+  else if (toISO(ws) === toISO(new Date(thisWs.getTime() - 7*864e5))) tag = ' · 지난 주';
+  return `${ws.getMonth()+1}/${ws.getDate()} ~ ${we.getMonth()+1}/${we.getDate()}${tag}`;
+}
+
+function moveWeek(delta) { currentWeekStart = new Date(currentWeekStart.getTime() + delta*7*864e5); loadData(); }
+function goToday() { currentWeekStart = getWeekStart(new Date()); loadData(); }
+function onDatePick() {
+  const v = document.getElementById('datePicker').value;
+  if (v) { currentWeekStart = getWeekStart(new Date(v + 'T12:00:00')); loadData(); }
+}
+
+async function loadData() {
+  document.getElementById('weekLabel').textContent = weekRangeLabel(currentWeekStart) + '  로딩 중...';
+  try {
+    const res = await fetch(`/api/weekly?weekStart=${toISO(currentWeekStart)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    render(data);
+  } catch(e) {
+    document.getElementById('mainContent').innerHTML = `<div class="error-box">❌ 데이터 로드 실패: ${e.message}</div>`;
+    document.getElementById('metricsStrip').innerHTML = '';
+    document.getElementById('weekLabel').textContent = '오류 발생';
+  }
+}
+
+async function refresh() {
+  document.getElementById('weekLabel').textContent = '새로고침 중...';
+  await fetch('/api/refresh');
+  await loadData();
+}
+
+function render(data) {
+  document.getElementById('datePicker').value = data.week.start;
+  document.getElementById('weekLabel').textContent = weekRangeLabel(currentWeekStart);
+
+  const d  = data.dashboard;
+  const c  = data.courses;
+  const t  = data.tasks;
+  const es = data.eval_stats      || {};
+  const bs = data.belt_summary    || [];
+  const mh = data.monthly_history || [];
+  const ws = data.weekly_stats    || {};
+  const cm = data.current_month   || '';
+  const ds = d.stats              || {};
+  const rr = data.roster_retention || {};
+
+  document.getElementById('metricsStrip').innerHTML = `
+    <div class="strip-group">
+      <span class="strip-label">이달 누적</span>
+      <span class="strip-item">교육생 <strong>${ds.students ?? '-'}명</strong></span>
+      <span class="strip-item">수료 <strong>${ds.graduates ?? '-'}명</strong></span>
+      <span class="strip-item">전체교육 <strong>${ds.total_edu ?? '-'}건</strong></span>
+      <span class="strip-item">수료완료 <strong>${ds.completed ?? '-'}건</strong></span>
+    </div>
+    <div class="strip-divider"></div>
+    <div class="strip-group">
+      <span class="strip-label">이번 주</span>
+      <span class="strip-item">교육 <strong>${ws.course_count ?? '-'}건</strong></span>
+      <span class="strip-item">교육생 <strong>${ws.enrolled ?? '-'}명</strong></span>
+      <span class="strip-item">수료 <strong>${ws.attended ?? '-'}명</strong></span>
+    </div>
+    <span class="strip-updated">${data.generated_at}</span>
+  `;
+
+  let html = '';
+
+  // ══════════════════════════════════════════════
+  // 카드 1: 주간보고
+  // ══════════════════════════════════════════════
+  html += `<div class="report-card">
+    <div class="card-header">
+      <span class="card-tag weekly">끌리메 주간보고</span>
+      <div class="card-title"><div class="card-title-dot"></div>이번 주 교육 현황</div>
+    </div>
+    <div class="card-body">`;
+
+  // 이번 주 타일
+  const mc = data.monthly_completion ?? 0;
+  html += `<div class="section-block">
+    <div class="tiles-sublabel">이번 주 <span style="color:#94a3b8;font-size:9px;font-weight:400">${data.week.start} ~ ${data.week.end}</span></div>
+    <div class="tiles-row">
+      ${tile('이번 주 교육', (ws.course_count ?? '-') + '건', '진행 건수', 'purple')}
+      ${tile('주간 교육생', (ws.enrolled ?? '-') + '명', '신청 인원', 'purple')}
+      ${tile('주간 수료', (ws.attended ?? '-') + '명', '참석 완료', 'teal')}
+      ${tile('미수료해소건', (ws.completion ?? '-') + '건', '이번 주 1회차', 'teal')}
+    </div>
+  </div>`;
+
+  // 이번 주 교육
+  const tw = c.this_week || [];
+  html += `<div class="section-block">
+    <div class="section-label">이번 주 진행 교육 <span class="sec-badge ${tw.length ? 'hot' : ''}">${tw.length}건</span></div>
+    <div class="course-list">`;
+  if (!tw.length) html += `<div class="empty">이번 주 진행 교육이 없습니다</div>`;
+  else tw.forEach(cr => { html += courseRow(cr, '#E11D48', true); });
+  html += `</div></div>`;
+
+  // 다음 주 예정
+  const nw = c.next_week || [];
+  html += `<div class="section-block">
+    <div class="section-label">다음 주 예정 교육 <span class="sec-badge">${nw.length}건</span></div>
+    <div class="course-list">`;
+  if (!nw.length) html += `<div class="empty">다음 주 예정 교육이 없습니다</div>`;
+  else nw.forEach(cr => { html += courseRow(cr, '#3b82f6', false); });
+  html += `</div></div>`;
+
+  // 폐강
+  const cancelled = data.cancelled || [];
+  if (cancelled.length) {
+    html += `<div class="section-block">
+      <div class="section-label">폐강·삭제 교육 <span class="sec-badge">${cancelled.length}건</span></div>
+      <div class="course-list">`;
+    cancelled.forEach(cr => {
+      const del = cr.deletedAt ? `<span style="font-size:10px;color:#94a3b8">삭제: ${cr.deletedAt}</span>` : '';
+      html += `<div class="course-row" style="background:#fafafa">
+        <div class="c-dot" style="background:#cbd5e1"></div>
+        <div class="c-title c-cancelled">${cr.title}</div>
+        <div class="c-date">${cr.startDate}</div>
+        ${del}
+        <span class="badge-폐강">폐강</span>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 주간 과제 현황
+  html += `<div class="section-block">
+    <div class="section-label">주간 과제 현황 <span class="sec-badge">${t.total}건</span></div>
+    <div class="task-big-row">
+      <div class="task-big-tile completed">
+        <div class="tb-num">${t.completed}</div>
+        <div class="tb-lbl">완료</div>
+      </div>
+      <div class="task-big-tile overdue">
+        <div class="tb-num">${t.overdue}</div>
+        <div class="tb-lbl">지연</div>
+      </div>
+      <div class="task-big-tile pending">
+        <div class="tb-num">${t.pending}</div>
+        <div class="tb-lbl">진행중</div>
+      </div>
+    </div>
+    <button class="btn-expand-task" id="taskExpandBtn" onclick="toggleTaskDetail()">
+      ${_taskExpanded ? '세부 내역 접기 ▲' : '세부 내역 보기 ▼'}
+    </button>
+    <div id="taskDetailWrap" class="task-detail-wrap" style="display:${_taskExpanded ? 'block' : 'none'}">`;
+
+  if (t.tasks && t.tasks.length) {
+    html += `<div class="task-list-wrap">`;
+    const sorted = [...t.tasks].sort((a,b) =>
+      ({OVERDUE:0,PENDING:1,COMPLETED:2}[a.status]??3) -
+      ({OVERDUE:0,PENDING:1,COMPLETED:2}[b.status]??3)
+    );
+    sorted.slice(0,20).forEach(task => {
+      const lbl = {COMPLETED:'완료',OVERDUE:'지연',PENDING:'진행중'}[task.status] || task.status;
+      const chips = [task.branchName, task.beauticianName, task.courseTitle].filter(Boolean);
+      const detail = chips.length
+        ? `<div class="chip-row">${chips.map(ch=>`<span class="chip">${ch}</span>`).join('')}${task.dueDate?`<span class="chip">마감: ${task.dueDate}</span>`:''}</div>`
+        : (task.dueDate ? `<div class="chip-row"><span class="chip">마감: ${task.dueDate}</span></div>` : '');
+      html += `<div class="task-item" onclick="this.classList.toggle('expanded')">
+        <div class="task-row">
+          <span class="t-status status-${task.status}">${lbl}</span>
+          <div class="t-title">${task.title||'-'}</div>
+          <div class="t-due">${task.dueDate||''}</div>
+          <span class="t-arrow">▶</span>
+        </div>
+        <div class="task-detail">${detail}</div>
+      </div>`;
+    });
+    if (t.tasks.length > 20) html += `<div style="text-align:center;padding:10px;color:#94a3b8;font-size:12px">외 ${t.tasks.length-20}건</div>`;
+    html += `</div>`;
+  } else {
+    html += `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:13px">과제가 없습니다</div>`;
+  }
+
+  html += `</div></div>`; // taskDetailWrap + section-block
+  html += `</div></div>`; // card-body + 주간 report-card
+
+  // ══════════════════════════════════════════════
+  // 카드 2: 월간보고
+  // ══════════════════════════════════════════════
+  html += `<div class="report-card">
+    <div class="card-header">
+      <span class="card-tag monthly">끌리메 월간보고</span>
+      <div class="card-title"><div class="card-title-dot" style="background:#7c3aed"></div>월별 현황 지표</div>
+    </div>
+    <div class="card-body">`;
+
+  // 이달 누적 타일
+  const mts = data.monthly_type_stats || {};
+  const TYPE_ORDER = ['아카데미 교육', '특별 교육'];
+  const TYPE_COLOR = {'아카데미 교육': {bg:'#eff6ff',border:'#bfdbfe',hd:'#1e40af',num:'#1d4ed8'}, '특별 교육': {bg:'#faf5ff',border:'#e9d5ff',hd:'#6d28d9',num:'#7c3aed'}};
+  const DEFAULT_COLOR = {bg:'#f8fafc',border:'#e2e8f0',hd:'#475569',num:'#334155'};
+  // 표시할 타입 목록 (정의된 순서 + 나머지)
+  const knownTypes = TYPE_ORDER.filter(t => mts[t]);
+  const otherTypes = Object.keys(mts).filter(t => !TYPE_ORDER.includes(t));
+  const allTypes = [...knownTypes, ...otherTypes];
+
+  html += `<div class="section-block">
+    <div class="tiles-sublabel">이달 누적 <span style="color:#94a3b8;font-size:9px;font-weight:400">${cm}</span></div>`;
+
+  if (allTypes.length > 0) {
+    html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">`;
+    allTypes.forEach(t => {
+      const s = mts[t];
+      const cl = TYPE_COLOR[t] || DEFAULT_COLOR;
+      const ft = s.first_time ?? 0;
+      html += `<div style="flex:1;min-width:180px;background:${cl.bg};border:1px solid ${cl.border};border-radius:14px;padding:16px 20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:11px;font-weight:800;color:${cl.hd};letter-spacing:.3px">${t}</div>
+          <div style="font-size:10px;color:#94a3b8">${s.courses}건</div>
+        </div>
+        <div style="display:flex;gap:14px;align-items:flex-end">
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">등록</div>
+            <div style="font-size:28px;font-weight:900;color:${cl.num};line-height:1">${s.enrolled}</div>
+            <div style="font-size:10px;color:#94a3b8">명</div>
+          </div>
+          <div style="font-size:22px;color:#e2e8f0;align-self:center">→</div>
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">참석완료</div>
+            <div style="font-size:28px;font-weight:900;color:${cl.num};line-height:1">${s.attended}</div>
+            <div style="font-size:10px;color:#94a3b8">명</div>
+          </div>
+          <div style="font-size:22px;color:#e2e8f0;align-self:center">→</div>
+          <div style="background:rgba(255,255,255,.7);border-radius:10px;padding:8px 12px;text-align:center">
+            <div style="font-size:10px;font-weight:700;color:#16a34a;margin-bottom:2px">1회차 수료</div>
+            <div style="font-size:26px;font-weight:900;color:#16a34a;line-height:1">${ft}</div>
+            <div style="font-size:10px;color:#94a3b8">명</div>
+          </div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+    // 실인원 안내 (중복 제거된 대시보드 수치)
+    html += `<div style="background:#f8fafc;border:1px solid #e8ecf0;border-radius:10px;padding:10px 16px;font-size:11px;color:#64748b;display:flex;gap:20px;flex-wrap:wrap">
+      <span style="font-weight:700;color:#475569">실인원 (중복제거)</span>
+      <span>교육생 <strong style="color:#1e40af">${ds.students ?? '-'}명</strong></span>
+      <span>수료인원 <strong style="color:#166534">${ds.graduates ?? '-'}명</strong></span>
+      <span style="color:#94a3b8">※ 한 명이 여러 교육 수강 시 건수는 중복 집계됩니다</span>
+    </div>`;
+  } else {
+    html += `<div class="tiles-row">
+      ${tile('당월 교육 참여 인원', (ds.students ?? '-') + '명', '실인원', 'blue')}
+      ${tile('당월 수료인원', (ds.graduates ?? '-') + '명', '실인원', 'green')}
+      ${tile('전체 교육', (ds.total_edu ?? '-') + '건', '신청 기준', 'gray')}
+      ${tile('수료 완료', (ds.completed ?? '-') + '건', '교육 기준', 'gray')}
+    </div>`;
+  }
+
+  html += `<div class="tiles-row" style="margin-top:8px">
+      ${tile('당월 미수료해소건', mc + '건', '1회차 수강 누적', 'green')}
+    </div>
+  </div>`;
+
+  // 신규입사자 재직률 (인명부 연동 · 화이트벨트 기준)
+  html += `<div class="section-block">
+    <div class="section-label">신규입사자 재직률 <span class="sec-badge" style="background:#fef3c7;color:#92400e">화이트벨트 · 직전 3개월</span></div>`;
+  if (!rr || rr.all_active === undefined) {
+    html += `<div class="course-list"><div class="empty">인명부 데이터를 불러올 수 없습니다</div></div>`;
+  } else {
+    const refMonths  = rr.ref_months || [];
+    const byMonth    = rr.by_month   || {};
+    const stab       = rr.stability  || {};
+    const stabTotal  = Object.values(stab).reduce((a,b) => a+b, 0);
+    const rate       = rr.rate;
+    const rateColor  = rate == null ? '#94a3b8' : rate >= 80 ? '#16a34a' : rate >= 60 ? '#d97706' : '#dc2626';
+    const mLabel = mk => `${parseInt(mk.split('-')[1])}월`;
+
+    // 재직률 큰 타일 + 월별 코호트
+    html += `<div style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;margin-bottom:14px">`;
+
+    html += `<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:18px 22px;display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:130px">
+      <div style="font-size:10px;font-weight:700;color:#7c3aed;letter-spacing:.5px;margin-bottom:4px">신규입사자 재직률</div>
+      <div style="font-size:48px;font-weight:900;color:${rateColor};line-height:1">${rate != null ? rate + '%' : '-'}</div>
+      <div style="font-size:10px;color:#94a3b8;margin-top:4px">${rr.active_cohort}명 재직 / ${rr.total_cohort}명 입사</div>
+    </div>`;
+
+    const mLabels = ['1개월 전', '2개월 전', '3개월 전'];
+    refMonths.forEach((mk, i) => {
+      const bm      = byMonth[mk] || {};
+      const total   = bm.total  ?? 0;
+      const active  = bm.active ?? 0;
+      const left    = bm.left   ?? 0;
+      const pct     = total > 0 ? Math.round(active / total * 100) : 100;
+      const pc      = pct >= 80 ? '#16a34a' : pct >= 60 ? '#d97706' : '#dc2626';
+      html += `<div style="flex:1;min-width:120px;background:#f8fafc;border:1px solid #e8ecf0;border-radius:12px;padding:14px 16px">
+        <div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:2px">${mLabels[i]}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:14px;font-weight:800;color:#475569">${mLabel(mk)}월 입사</div>
+          <div style="font-size:10px;font-weight:700;color:#7c3aed;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;padding:2px 7px">입사 ${total}명</div>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px">
+          <span style="font-size:30px;font-weight:900;color:${pc};line-height:1">${active}</span>
+          <span style="font-size:12px;color:#94a3b8">명 재직</span>
+        </div>
+        <div style="font-size:10px;color:#64748b">재직률 <strong style="color:${pc}">${pct}%</strong>${left > 0 ? ` · 퇴사 <strong style="color:#dc2626">${left}명</strong>` : ''}</div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // 근무안정도 (화이트벨트 재직자)
+    if (stabTotal > 0) {
+      const bars = [
+        {label:'안정',   val:(stab['매우안정']||0)+(stab['안정']||0), color:'#16a34a', bg:'#f0fdf4', bc:'#bbf7d0'},
+        {label:'보통',   val:stab['보통']||0,                           color:'#d97706', bg:'#fffbeb', bc:'#fde68a'},
+        {label:'불안정', val:stab['불안정']||0,                         color:'#dc2626', bg:'#fff5f5', bc:'#fecaca'},
+      ];
+      html += `<div style="border:1px solid #e8ecf0;border-radius:10px;padding:14px 18px;background:#fafbfc">
+        <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase">
+          근무안정도 <span style="color:#94a3b8;font-weight:400;text-transform:none">화이트벨트 재직자 ${stabTotal}명 기준</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">`;
+      bars.forEach(b => {
+        const pct = stabTotal > 0 ? Math.round(b.val / stabTotal * 100) : 0;
+        html += `<div style="flex:1;min-width:110px;background:${b.bg};border:1px solid ${b.bc};border-radius:8px;padding:10px 14px">
+          <div style="font-size:10px;font-weight:700;color:${b.color}">${b.label}</div>
+          <div style="font-size:26px;font-weight:900;color:${b.color};line-height:1.2">${b.val}명</div>
+          <div style="font-size:11px;color:${b.color};opacity:.7">${pct}%</div>
+        </div>`;
+      });
+      html += `</div></div>`;
+    }
+  }
+  html += `</div>`;
+
+  // 월별 지표 히스토리
+  html += `<div class="section-block">
+    <div class="section-label">월별 평가 · 정착 지표</div>`;
+  if (!mh.length) {
+    html += `<div class="course-list"><div class="empty">이번 달 첫 집계 중입니다</div></div>`;
+  } else {
+    html += `<table class="data-table"><thead><tr>
+      <th style="min-width:100px;text-align:left">월</th>
+      <th>재교육 필요 비율<br><span style="font-weight:400;opacity:.7;font-size:10px">70점 미만</span></th>
+      <th>미수료 적체<br><span style="font-weight:400;opacity:.7;font-size:10px">누적 건수</span></th>
+      <th>전달 대비 해소<br><span style="font-weight:400;opacity:.7;font-size:10px">건수 변화</span></th>
+      <th>미수료해소건<br><span style="font-weight:400;opacity:.7;font-size:10px">1회차 수강 완료</span></th>
+      <th>신규 정착률<br><span style="font-weight:400;opacity:.7;font-size:10px">화이트벨트 기준</span></th>
+    </tr></thead><tbody>`;
+    [...mh].reverse().slice(0,6).reverse().forEach(row => {
+      const isCurr = row.month === cm;
+      const mLabel = row.month.replace('-', '년 ') + '월';
+      const badge = isCurr ? `<span class="month-chip">이번 달</span>` : '';
+      const reEduHtml = row.re_edu_ratio != null
+        ? `<span class="${row.re_edu_ratio >= 30 ? 'v-bad' : row.re_edu_ratio >= 15 ? 'v-warn' : 'v-good'}">${row.re_edu_ratio}%</span>`
+        : `<span class="v-none">-</span>`;
+      const incHtml = row.incomplete != null
+        ? `<span style="font-weight:700;color:#1C3557">${row.incomplete.toLocaleString()}건</span>`
+        : `<span class="v-none">-</span>`;
+      let deltaHtml = `<span class="delta-chip none">기준 없음</span>`;
+      if (row.incomplete_delta !== null && row.incomplete_delta !== undefined) {
+        deltaHtml = row.incomplete_delta < 0
+          ? `<span class="delta-chip down">▼ ${Math.abs(row.incomplete_delta)}건 해소</span>`
+          : row.incomplete_delta > 0
+            ? `<span class="delta-chip up">▲ ${row.incomplete_delta}건 증가</span>`
+            : `<span class="delta-chip none">변동 없음</span>`;
+      }
+      const compHtml = row.completion != null
+        ? `<span style="font-weight:700;color:#166534">${row.completion}건</span>`
+        : `<span class="v-none">-</span>`;
+      const retHtml = row.retention_rate != null
+        ? `<span class="${row.retention_rate >= 80 ? 'v-good' : row.retention_rate >= 50 ? 'v-warn' : 'v-bad'}">${row.retention_rate}%</span>`
+        : `<span class="v-none">-</span>`;
+      html += `<tr class="${isCurr ? 'current-row' : ''}">
+        <td>${mLabel}${badge}</td>
+        <td>${reEduHtml}</td>
+        <td>${incHtml}</td>
+        <td>${deltaHtml}</td>
+        <td>${compHtml}</td>
+        <td>${retHtml}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    if (mh.length > 6) html += `<div style="font-size:11px;color:#64748b;text-align:right;margin-top:6px">최근 6개월 표시 · 전체 ${mh.length}개월 저장됨</div>`;
+  }
+  html += `</div>`;
+
+  // 교육 평가 결과
+  const evalList = es.by_curriculum || [];
+  const monthTag = es.month_filtered ? `<span class="month-chip">${cm} 기준</span>` : '';
+  html += `<div class="section-block">
+    <div class="section-label">교육 평가 결과 <span class="sec-badge">${es.total ?? 0}건</span>${monthTag}</div>`;
+  if (!evalList.length) {
+    html += `<div class="course-list"><div class="empty">평가 데이터가 없습니다</div></div>`;
+  } else {
+    html += `<table class="data-table"><thead><tr>
+      <th style="text-align:left;min-width:150px">프로그램</th>
+      <th style="width:60px">건수</th>
+      <th style="min-width:180px">평균 점수</th>
+      <th style="width:80px">70점 미만</th>
+    </tr></thead><tbody>`;
+    evalList.forEach(ev => {
+      const sc = ev.avg_score;
+      const cls = sc >= 80 ? 'v-good' : sc >= 70 ? 'v-warn' : 'v-bad';
+      const bar = sc >= 80 ? '#16a34a' : sc >= 70 ? '#d97706' : '#dc2626';
+      const b70 = ev.below70 > 0 ? `<span class="below70">${ev.below70}명</span>` : `<span class="v-none">-</span>`;
+      html += `<tr>
+        <td style="font-weight:600">${ev.curriculum}</td>
+        <td style="color:#64748b">${ev.count}건</td>
+        <td><div class="score-bar-wrap">
+          <div class="score-bar-bg"><div class="score-bar-fill" style="width:${Math.min(100,sc)}%;background:${bar}"></div></div>
+          <span class="score-val ${cls}">${sc}점</span>
+        </div></td>
+        <td>${b70}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `</div>`;
+
+  // 벨트별 미수료
+  html += `<div class="section-block">
+    <div class="section-label">벨트별 미수료 핵심 요약 <span class="sec-badge">전체 ${d.staff_count}명</span></div>`;
+  if (!bs.length) {
+    html += `<div class="course-list"><div class="empty">데이터 없음</div></div>`;
+  } else {
+    html += `<table class="data-table"><thead><tr>
+      <th style="text-align:left">벨트</th>
+      <th style="width:60px">인원</th>
+      <th style="width:100px">전수료</th>
+      <th style="width:70px">미수료</th>
+      <th>미수료 집중 프로그램 TOP3</th>
+    </tr></thead><tbody>`;
+    bs.forEach(b => {
+      const chips = b.top_incomplete.map((p,i) =>
+        `<span class="prog-chip ${i===0?'top':''}">${p.program} <strong>${p.count}</strong>명</span>`
+      ).join('');
+      html += `<tr>
+        <td><span class="belt-chip belt-${b.belt}">${b.belt}</span></td>
+        <td style="text-align:center">${b.total}명</td>
+        <td style="text-align:center;color:#16a34a;font-weight:700">${b.complete}명 <span style="color:#94a3b8;font-weight:400">(${b.rate}%)</span></td>
+        <td style="text-align:center;color:${b.incomplete_count?'#dc2626':'#94a3b8'};font-weight:700">${b.incomplete_count}명</td>
+        <td><div class="prog-chips">${chips || '<span class="v-none">없음</span>'}</div></td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `</div>`;
+
+  html += `</div></div>`; // card-body + 월간 report-card
+
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+function tile(label, value, sub, color) {
+  return `<div class="tile ${color}">
+    <div class="tile-lbl">${label}</div>
+    <div class="tile-val">${value}</div>
+    <div class="tile-sub">${sub}</div>
+  </div>`;
+}
+
+function courseRow(cr, dotColor, showStats) {
+  const dateStr = cr.startDate === cr.endDate ? cr.startDate : `${cr.startDate} ~ ${cr.endDate}`;
+  const stats = showStats && cr.enrolled !== undefined
+    ? `<span class="c-stats">${cr.enrolled}명 신청 · ${cr.attended}명 참석</span>` : '';
+  return `<div class="course-row">
+    <div class="c-dot" style="background:${dotColor}"></div>
+    <div class="c-title">${cr.title}</div>
+    <div class="c-date">${dateStr}</div>
+    ${stats}
+    <div class="c-type">${cr.type || '아카데미'}</div>
+  </div>`;
+}
+
+function toggleTaskDetail() {
+  _taskExpanded = !_taskExpanded;
+  const el  = document.getElementById('taskDetailWrap');
+  const btn = document.getElementById('taskExpandBtn');
+  if (el)  el.style.display = _taskExpanded ? 'block' : 'none';
+  if (btn) btn.textContent  = _taskExpanded ? '세부 내역 접기 ▲' : '세부 내역 보기 ▼';
+}
+
+// ══════════════════════════════════════════════
+// 비정기 주요업무 (localStorage)
+// ══════════════════════════════════════════════
+const IRR_KEY    = 'cclime_irr_tasks';
+const IRR_STATUS = ['예정', '진행중', '완료', '보류'];
+const IRR_COLOR  = { 예정:'#1d4ed8', 진행중:'#d97706', 완료:'#16a34a', 보류:'#6b7280' };
+const IRR_BG     = { 예정:'#dbeafe', 진행중:'#fef3c7', 완료:'#dcfce7', 보류:'#f1f5f9' };
+
+function irrLoad() {
+  try { return JSON.parse(localStorage.getItem(IRR_KEY) || '[]'); } catch { return []; }
+}
+function irrSave(rows) { localStorage.setItem(IRR_KEY, JSON.stringify(rows)); }
+
+function irrUpdate(idx, field, val) {
+  const rows = irrLoad();
+  if (rows[idx]) { rows[idx][field] = val; irrSave(rows); }
+}
+function irrStatusChange(idx, val) { irrUpdate(idx, 'status', val); renderIrregular(); }
+function irrAdd() {
+  const rows = irrLoad();
+  rows.push({ name:'', content:'', period:'', status:'진행중', note:'' });
+  irrSave(rows);
+  renderIrregular();
+}
+function irrDel(idx) {
+  if (!confirm('이 항목을 삭제하시겠습니까?')) return;
+  const rows = irrLoad();
+  rows.splice(idx, 1);
+  irrSave(rows);
+  renderIrregular();
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderIrregular() {
+  const rows = irrLoad();
+  const card = document.getElementById('irregularCard');
+  if (!card) return;
+
+  let html = `<div class="report-card">
+    <div class="card-header">
+      <span class="card-tag irregular">비정기</span>
+      <div class="card-title">
+        <div class="card-title-dot" style="background:#d97706"></div>
+        비정기 주요업무
+      </div>
+    </div>
+    <div class="card-body">`;
+
+  if (!rows.length) {
+    html += `<div class="irr-empty">아래 버튼을 눌러 업무를 추가하세요</div>`;
+  } else {
+    html += `<div style="overflow-x:auto"><div class="irr-wrap"><table class="irr-table">
+      <thead><tr>
+        <th style="width:22%">업무명</th>
+        <th style="width:30%">세부 내용</th>
+        <th style="width:14%">기간</th>
+        <th style="width:10%">상태</th>
+        <th>비고</th>
+        <th style="width:50px;text-align:center"></th>
+      </tr></thead>
+      <tbody>`;
+
+    rows.forEach((r, i) => {
+      const sc = IRR_COLOR[r.status] || '#1a202c';
+      const sb = IRR_BG[r.status]    || '#f1f5f9';
+      const opts = IRR_STATUS.map(s =>
+        `<option value="${s}"${s === r.status ? ' selected' : ''}>${s}</option>`
+      ).join('');
+      html += `<tr>
+        <td><input class="irr-input" value="${esc(r.name)}"    placeholder="업무명"    oninput="irrUpdate(${i},'name',this.value)"></td>
+        <td><input class="irr-input" value="${esc(r.content)}" placeholder="내용"      oninput="irrUpdate(${i},'content',this.value)"></td>
+        <td><input class="irr-input" value="${esc(r.period)}"  placeholder="예) 6/24~7/1" oninput="irrUpdate(${i},'period',this.value)"></td>
+        <td>
+          <select class="irr-status-sel" style="color:${sc};background:${sb};border-color:${sc}40"
+            onchange="irrStatusChange(${i},this.value)">
+            ${opts}
+          </select>
+        </td>
+        <td><input class="irr-input" value="${esc(r.note)}" placeholder="비고" oninput="irrUpdate(${i},'note',this.value)"></td>
+        <td style="text-align:center">
+          <button class="irr-del" onclick="irrDel(${i})">삭제</button>
+        </td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div></div>`;
+  }
+
+  html += `<button class="btn-add-row" onclick="irrAdd()">＋ 업무 추가</button>`;
+  html += `</div></div>`;
+
+  card.innerHTML = html;
+}
+
+// 초기화
+loadData();
+renderIrregular();
+setInterval(loadData, 5 * 60 * 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# 민감 정보 — 절대 커밋하지 마세요
+config.py
+
+# 런타임 파일
+server.pid
+server.log
+history.json
+__pycache__/
+*.pyc
+
+# 디버그용 HTML 스냅샷
+dashboard.html
+courses.html
+tasks.html
+test_fetch.py
