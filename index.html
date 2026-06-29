@@ -111,9 +111,10 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
 .task-item:hover { background: #fafbfc; }
 .task-row { display: flex; align-items: center; gap: 8px; }
 .t-status { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
-.status-COMPLETED { background: #dcfce7; color: #16a34a; }
-.status-OVERDUE   { background: #fee2e2; color: #dc2626; }
-.status-PENDING   { background: #fef3c7; color: #d97706; }
+.status-COMPLETED   { background: #dcfce7; color: #16a34a; }
+.status-OVERDUE     { background: #fee2e2; color: #dc2626; }
+.status-PENDING     { background: #fef3c7; color: #d97706; }
+.status-IN_PROGRESS { background: #fef3c7; color: #d97706; }
 .t-title { font-size: 13px; font-weight: 600; flex: 1; }
 .t-due   { font-size: 11px; color: #94a3b8; flex-shrink: 0; }
 .t-arrow { font-size: 9px; color: #cbd5e1; transition: transform 0.2s; flex-shrink: 0; }
@@ -450,13 +451,9 @@ function render(data) {
         <div class="tb-lbl">지연</div>
       </div>
       <div class="task-big-tile pending">
-        <div class="tb-num">${t.pending}</div>
+        <div class="tb-num">${(t.pending||0) + (t.in_progress||0)}</div>
         <div class="tb-lbl">진행중</div>
       </div>
-      ${Math.max(0, t.total - (t.completed||0) - (t.overdue||0) - (t.pending||0)) > 0 ? `<div class="task-big-tile" style="background:#f8fafc;border:1px solid #e2e8f0">
-        <div class="tb-num" style="color:#64748b">${Math.max(0, t.total - (t.completed||0) - (t.overdue||0) - (t.pending||0))}</div>
-        <div class="tb-lbl" style="color:#64748b">미분류</div>
-      </div>` : ''}
     </div>
     <button class="btn-expand-task" id="taskExpandBtn" onclick="toggleTaskDetail()">
       ${_taskExpanded ? '세부 내역 접기 ▲' : '세부 내역 보기 ▼'}
@@ -465,12 +462,10 @@ function render(data) {
 
   if (t.tasks && t.tasks.length) {
     html += `<div class="task-list-wrap">`;
-    const sorted = [...t.tasks].sort((a,b) =>
-      ({OVERDUE:0,PENDING:1,COMPLETED:2}[a.status]??3) -
-      ({OVERDUE:0,PENDING:1,COMPLETED:2}[b.status]??3)
-    );
+    const statusRank = s => s === 'OVERDUE' ? 0 : s === 'COMPLETED' ? 2 : 1;
+    const sorted = [...t.tasks].sort((a,b) => statusRank(a.status) - statusRank(b.status));
     sorted.slice(0,20).forEach(task => {
-      const lbl = {COMPLETED:'완료',OVERDUE:'지연',PENDING:'진행중'}[task.status] || task.status;
+      const lbl = {COMPLETED:'완료',OVERDUE:'지연',PENDING:'진행중'}[task.status] || '진행중';
       const chips = [task.branchName, task.beauticianName, task.courseTitle].filter(Boolean);
       const detail = chips.length
         ? `<div class="chip-row">${chips.map(ch=>`<span class="chip">${ch}</span>`).join('')}${task.dueDate?`<span class="chip">마감: ${task.dueDate}</span>`:''}</div>`

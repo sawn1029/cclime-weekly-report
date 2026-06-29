@@ -385,6 +385,8 @@ def parse_tasks(html):
             for t in tasks:
                 s = t.get('status', 'UNKNOWN')
                 by_status.setdefault(s, []).append(t)
+            known = {'PENDING', 'COMPLETED', 'OVERDUE'}
+            in_progress = sum(1 for t in tasks if t.get('status') not in known)
             return {
                 'tasks': tasks,
                 'by_status': by_status,
@@ -392,8 +394,9 @@ def parse_tasks(html):
                 'pending': len(by_status.get('PENDING', [])),
                 'completed': len(by_status.get('COMPLETED', [])),
                 'overdue': len(by_status.get('OVERDUE', [])),
+                'in_progress': in_progress,
             }
-    return {'tasks': [], 'total': 0, 'pending': 0, 'completed': 0, 'overdue': 0}
+    return {'tasks': [], 'total': 0, 'pending': 0, 'completed': 0, 'overdue': 0, 'in_progress': 0}
 
 # ─── 평가 데이터 ───────────────────────────────────
 
