@@ -565,17 +565,27 @@ def load_irr_tasks():
         try:
             with open(IRR_FILE, 'r') as f:
                 data = json.load(f)
-            # 구버전(리스트) → 딕셔너리 자동 변환
-            if isinstance(data, list):
-                return {}
-            return data
+            if isinstance(data, dict):
+                return data
+            # 구버전(리스트) → 'legacy' 키로 보존
+            if isinstance(data, list) and data:
+                return {'legacy': data}
         except Exception:
             pass
+    # history.json fallback (더 구버전)
+    old = _load_history().get('irr_tasks', [])
+    if old:
+        return {'legacy': old}
     return {}
 
 def load_irr_week(week_start):
-    """특정 주차 태스크만 반환"""
-    return load_irr_tasks().get(week_start, [])
+    """특정 주차 태스크 반환 (legacy 데이터는 모든 주차에서 보임)"""
+    all_data = load_irr_tasks()
+    tasks = list(all_data.get(week_start, []))
+    # legacy 데이터 병합 (주차 미지정 구버전 데이터)
+    for t in all_data.get('legacy', []):
+        tasks.append({**t, '_legacy': True})
+    return tasks
 
 def save_irr_tasks(tasks):
     """irr_tasks.json 저장 후 GitHub API로 자동 커밋"""
