@@ -549,6 +549,24 @@ def get_monthly_completion_total(month_key):
     cc = history.get('completion_cases', {})
     return sum(v for k, v in cc.items() if k.startswith(month_key))
 
+def save_weekly_stats(week_start_iso, stats_dict):
+    """주별 핵심 지표를 history.json에 저장 (최근 13주)"""
+    history = _load_history()
+    wh = history.setdefault('weekly_history', {})
+    wh[week_start_iso] = stats_dict
+    if len(wh) > 13:
+        del wh[sorted(wh.keys())[0]]
+    _save_history(history)
+
+def get_prev_week_stats(week_start_iso):
+    """전주 통계 반환"""
+    try:
+        prev_start = (date.fromisoformat(week_start_iso) - timedelta(days=7)).isoformat()
+    except Exception:
+        return None
+    history = _load_history()
+    return history.get('weekly_history', {}).get(prev_start)
+
 def get_monthly_history():
     """history.json에서 월별 통합 지표 반환 (시계열 리스트)"""
     history = _load_history()
@@ -863,6 +881,27 @@ def collect_all(week_start_str=None):
             weekly_attended += stats['attended']
             weekly_first_time += stats.get('first_time', 0)
 
+    # 전주 대비 델타
+    prev_ws_data = get_prev_week_stats(week_start.isoformat())
+    weekly_completion_rate = round(weekly_attended / weekly_enrolled * 100) if weekly_enrolled else None
+    prev_completion_rate = (
+        round(prev_ws_data['attended'] / prev_ws_data['enrolled'] * 100)
+        if prev_ws_data and prev_ws_data.get('enrolled') else None
+    )
+    weekly_delta = {
+        'course_count':    (len(this_week)  - prev_ws_data.get('course_count', 0)) if prev_ws_data else None,
+        'attended':        (weekly_attended - prev_ws_data.get('attended', 0))      if prev_ws_data else None,
+        'enrolled':        (weekly_enrolled - prev_ws_data.get('enrolled', 0))      if prev_ws_data else None,
+        'completion_rate': ((weekly_completion_rate or 0) - prev_completion_rate)
+                           if (weekly_completion_rate is not None and prev_completion_rate is not None) else None,
+    }
+    save_weekly_stats(week_start.isoformat(), {
+        'course_count': len(this_week),
+        'attended':     weekly_attended,
+        'enrolled':     weekly_enrolled,
+        'first_time':   weekly_first_time,
+    })
+
     # 당월 교육 타입별 집계 (참여/수료 건수)
     monthly_type_stats = {}
     monthly_courses = [
@@ -940,10 +979,14 @@ def collect_all(week_start_str=None):
         'courses': courses_data,
         'tasks': parse_tasks(tasks_html),
         'weekly_stats': {
-            'course_count': len(this_week),
-            'enrolled': weekly_enrolled,
-            'attended': weekly_attended,
-            'completion': weekly_first_time,  # 미수료해소건 = 이번 주 1회차 수료자
+            'course_count':         len(this_week),
+            'enrolled':             weekly_enrolled,
+            'attended':             weekly_attended,
+            'completion':           weekly_first_time,
+            'completion_rate':      weekly_completion_rate,
+            'prev_completion_rate': prev_completion_rate,
+            'prev':                 prev_ws_data,
+            'delta':                weekly_delta,
         },
         'monthly_completion': monthly_completion,
         'monthly_type_stats': monthly_type_stats,

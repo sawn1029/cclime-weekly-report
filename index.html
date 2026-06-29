@@ -329,18 +329,82 @@ function render(data) {
     <div class="card-header">
       <span class="card-tag weekly">끌리메 주간보고</span>
       <div class="card-title"><div class="card-title-dot"></div>이번 주 교육 현황</div>
+      <span style="margin-left:auto;font-size:11px;color:#8b949e">${data.week.start} ~ ${data.week.end}</span>
     </div>
     <div class="card-body">`;
 
-  // 이번 주 타일
-  const mc = data.monthly_completion ?? 0;
+  const mc  = data.monthly_completion ?? 0;
+  const wd  = ws.delta || {};
+  const wRate   = ws.completion_rate;
+  const prevRate = ws.prev_completion_rate;
+  const prevWs  = ws.prev || {};
+
+  function dArrow(v) { return v > 0 ? '↑' : v < 0 ? '↓' : '→'; }
+  function dColor(v) { return v == null ? '#94a3b8' : v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : '#94a3b8'; }
+  function rColor(r) { return r == null ? '#64748b' : r >= 80 ? '#166534' : r >= 60 ? '#92400e' : '#991b1b'; }
+  function rBg(r)    { return r == null ? '#f8fafc' : r >= 80 ? '#f0fdf4' : r >= 60 ? '#fffbeb' : '#fff5f5'; }
+
+  // ── 한 줄 결론 배너 ──
+  const worstBelt = bs.find(b => b.total > 0 && b.rate < 100);
+  const topProg   = worstBelt?.top_incomplete?.[0];
+  const goodTags  = [], alertTags = [];
+  if (wRate === 100 && (ws.attended ?? 0) > 0) goodTags.push('양호');
+  if (!(ws.completion) && (data.total_incomplete ?? 0) > 0) alertTags.push('미수료 해소 미진행');
+  if (worstBelt && worstBelt.rate === 0) alertTags.push(worstBelt.belt + '벨트 전수료 0%');
+
+  const badgeHtml = [
+    ...goodTags.map(t => `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:800;color:#166534;background:#dcfce7">${t}</span>`),
+    ...(alertTags.length ? [`<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:800;color:#92400e;background:#fef3c7">주의 ${alertTags.length}건</span>`] : []),
+  ].join(' ') || `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:800;color:#64748b;background:#f1f5f9">집계중</span>`;
+
+  let summaryText = `교육 ${ws.course_count ?? 0}건 진행`;
+  if ((ws.enrolled ?? 0) > 0) {
+    summaryText += `·${ws.attended}명${ws.attended === ws.enrolled ? ' 전원' : '/' + ws.enrolled + '명'} 수료`;
+  }
+  if ((data.total_incomplete ?? 0) > 0) {
+    summaryText += `. 미수료 백로그 ${data.total_incomplete}건 그대로`;
+    if (worstBelt) summaryText += ` — ${worstBelt.belt}벨트 전수료 ${worstBelt.rate}%${topProg ? '(' + topProg.program + ' 병목)' : ''}가 최대 리스크`;
+    summaryText += '.';
+  }
+
+  html += `<div style="border-left:3px solid #f59e0b;background:#fffbeb;padding:12px 16px;margin-bottom:16px;border-radius:0 10px 10px 0">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      ${badgeHtml}
+      <span style="font-size:11px;font-weight:700;color:#92400e">이번 주 한 줄 결론</span>
+    </div>
+    <div style="font-size:13px;color:#1a202c;line-height:1.65">${summaryText}</div>
+  </div>`;
+
+  // ── 이번 주 타일 (델타 포함) ──
   html += `<div class="section-block">
-    <div class="tiles-sublabel">이번 주 <span style="color:#94a3b8;font-size:9px;font-weight:400">${data.week.start} ~ ${data.week.end}</span></div>
+    <div class="tiles-sublabel">이번 주 주요 지표</div>
     <div class="tiles-row">
-      ${tile('이번 주 교육', (ws.course_count ?? '-') + '건', '진행 건수', 'purple')}
-      ${tile('주간 교육생', (ws.enrolled ?? '-') + '명', '신청 인원', 'purple')}
-      ${tile('주간 수료', (ws.attended ?? '-') + '명', '참석 완료', 'teal')}
-      ${tile('미수료해소건', (ws.completion ?? '-') + '건', '이번 주 1회차', 'teal')}
+      <div class="tile purple">
+        <div class="tile-lbl">이번 주 교육</div>
+        <div style="display:flex;align-items:baseline;gap:5px">
+          <div class="tile-val">${ws.course_count ?? '-'}건</div>
+          ${wd.course_count != null ? `<span style="font-size:15px;font-weight:800;color:${dColor(wd.course_count)}">${dArrow(wd.course_count)}${Math.abs(wd.course_count)}</span>` : ''}
+        </div>
+        <div class="tile-sub">${prevWs.course_count != null ? '전주 ' + prevWs.course_count + '건' : '전주 비교 없음'}</div>
+      </div>
+      <div class="tile purple">
+        <div class="tile-lbl">주간 수료</div>
+        <div style="display:flex;align-items:baseline;gap:5px">
+          <div class="tile-val">${ws.attended ?? '-'}명</div>
+          ${wd.attended != null ? `<span style="font-size:15px;font-weight:800;color:${dColor(wd.attended)}">${dArrow(wd.attended)}${Math.abs(wd.attended)}</span>` : ''}
+        </div>
+        <div class="tile-sub">신청 ${ws.enrolled ?? '-'}명${prevWs.attended != null ? ' · 전주 ' + prevWs.attended + '명' : ''}</div>
+      </div>
+      <div class="tile" style="background:${rBg(wRate)}">
+        <div class="tile-lbl">주간 수료율</div>
+        <div class="tile-val" style="color:${rColor(wRate)}">${wRate != null ? wRate + '%' : '-'}</div>
+        <div class="tile-sub">${(ws.enrolled ?? 0) > 0 ? ws.attended + '/' + ws.enrolled : '-'}${prevRate != null ? ' · 전주 ' + prevRate + '%' : ''}</div>
+      </div>
+      <div class="tile" style="background:${(ws.completion ?? 0) > 0 ? '#f0fdfa' : '#fffbeb'}">
+        <div class="tile-lbl">미수료 해소</div>
+        <div class="tile-val" style="color:${(ws.completion ?? 0) > 0 ? '#0f766e' : '#92400e'}">${ws.completion ?? 0}건</div>
+        <div class="tile-sub" style="color:${(ws.completion ?? 0) > 0 ? '#0f766e' : '#d97706'};font-weight:700">${(ws.completion ?? 0) > 0 ? '1회차 수료' : '미진행'} · 백로그 ${data.total_incomplete ?? '-'}건</div>
+      </div>
     </div>
   </div>`;
 
@@ -397,6 +461,10 @@ function render(data) {
         <div class="tb-num">${t.pending}</div>
         <div class="tb-lbl">진행중</div>
       </div>
+      ${Math.max(0, t.total - (t.completed||0) - (t.overdue||0) - (t.pending||0)) > 0 ? `<div class="task-big-tile" style="background:#f8fafc;border:1px solid #e2e8f0">
+        <div class="tb-num" style="color:#64748b">${Math.max(0, t.total - (t.completed||0) - (t.overdue||0) - (t.pending||0))}</div>
+        <div class="tb-lbl" style="color:#64748b">미분류</div>
+      </div>` : ''}
     </div>
     <button class="btn-expand-task" id="taskExpandBtn" onclick="toggleTaskDetail()">
       ${_taskExpanded ? '세부 내역 접기 ▲' : '세부 내역 보기 ▼'}
@@ -621,10 +689,16 @@ function render(data) {
     const retColor = latest.retention_rate == null ? '#94a3b8'
       : latest.retention_rate >= 80 ? '#16a34a' : latest.retention_rate >= 50 ? '#d97706' : '#dc2626';
 
+    const reEduRate = latest.re_edu_ratio;
+    const retRate   = latest.retention_rate;
+    const reEduBg = reEduRate == null ? '#fffbeb' : reEduRate >= 30 ? '#fff5f5' : reEduRate >= 15 ? '#fffbeb' : '#f0fdf4';
+    const reEduBd = reEduRate == null ? '#fde68a' : reEduRate >= 30 ? '#fecaca' : reEduRate >= 15 ? '#fde68a' : '#bbf7d0';
+    const retBg   = retRate   == null ? '#faf5ff' : retRate   >= 80 ? '#f0fdf4' : retRate   >= 60 ? '#fffbeb' : '#fff5f5';
+    const retBd   = retRate   == null ? '#e9d5ff' : retRate   >= 80 ? '#bbf7d0' : retRate   >= 60 ? '#fde68a' : '#fecaca';
     const kpis = [
       { label:'미수료해소건', val: latest.completion != null ? latest.completion+'건' : '-', sub:'이달 1회차 수강 완료', subColor:'#94a3b8', bg:'#f0fdf4', border:'#bbf7d0', valColor:'#16a34a' },
-      { label:'재교육 필요 비율', val: latest.re_edu_ratio != null ? latest.re_edu_ratio+'%' : '-', sub:'70점 미만 평가', subColor:'#94a3b8', bg:'#fffbeb', border:'#fde68a', valColor: reEduColor },
-      { label:'신규 정착률', val: latest.retention_rate != null ? latest.retention_rate+'%' : '-', sub:'화이트벨트 기준', subColor:'#94a3b8', bg:'#faf5ff', border:'#e9d5ff', valColor: retColor },
+      { label:'재교육 필요 비율', val: latest.re_edu_ratio != null ? latest.re_edu_ratio+'%' : '-', sub:'70점 미만 평가', subColor:'#94a3b8', bg:reEduBg, border:reEduBd, valColor: reEduColor },
+      { label:'신규 정착률', val: latest.retention_rate != null ? latest.retention_rate+'%' : '-', sub:'화이트벨트 기준', subColor:'#94a3b8', bg:retBg, border:retBd, valColor: retColor },
     ];
 
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">`;
@@ -637,17 +711,21 @@ function render(data) {
     });
     html += `</div>`;
 
-    // ── 재교육·정착률 차트 ──
-    html += `<div style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;padding:16px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px">재교육 필요 비율 · 신규 정착률</div>
-      <div style="position:relative;height:160px"><canvas id="mhChart2"></canvas></div>
-    </div>`;
-
-    // ── 미수료해소건 막대 차트 ──
-    html += `<div style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;padding:16px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px">미수료해소건 월별 추이 <span style="font-size:10px;font-weight:400;color:#94a3b8">— 1회차 수강 완료 건수</span></div>
-      <div style="position:relative;height:90px"><canvas id="mhChart3"></canvas></div>
-    </div>`;
+    // ── 차트: 2개월 이상 데이터가 있을 때만 표시 ──
+    if (recent6.length >= 2) {
+      html += `<div style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px">재교육 필요 비율 · 신규 정착률</div>
+        <div style="position:relative;height:160px"><canvas id="mhChart2"></canvas></div>
+      </div>
+      <div style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px">미수료해소건 월별 추이 <span style="font-size:10px;font-weight:400;color:#94a3b8">— 1회차 수강 완료 건수</span></div>
+        <div style="position:relative;height:90px"><canvas id="mhChart3"></canvas></div>
+      </div>`;
+    } else {
+      html += `<div style="background:#f8fafc;border:1px dashed #e2e8f0;border-radius:10px;padding:10px 16px;margin-bottom:12px;font-size:12px;color:#94a3b8;text-align:center">
+        데이터가 2개월 이상 누적되면 추이 차트가 자동으로 표시됩니다
+      </div>`;
+    }
 
     // ── 상세 테이블 (접기) ──
     html += `<button id="mhTableBtn" onclick="toggleMhTable()"
@@ -767,7 +845,7 @@ function toggleMhTable() {
 }
 
 function initMhCharts(mh, cm) {
-  if (!window.Chart || !mh || !mh.length) return;
+  if (!window.Chart || !mh || mh.length < 2) return;
   ['_mhC2','_mhC3'].forEach(k => {
     if (window[k]) { try { window[k].destroy(); } catch(e) {} window[k] = null; }
   });
