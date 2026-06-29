@@ -206,6 +206,7 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
   .data-table { font-size: 12px; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -587,15 +588,71 @@ function render(data) {
   if (!mh.length) {
     html += `<div class="course-list"><div class="empty">이번 달 첫 집계 중입니다</div></div>`;
   } else {
-    html += `<table class="data-table"><thead><tr>
-      <th style="min-width:100px;text-align:left">월</th>
-      <th>재교육 필요 비율<br><span style="font-weight:400;opacity:.7;font-size:10px">70점 미만</span></th>
-      <th>미수료 적체<br><span style="font-weight:400;opacity:.7;font-size:10px">누적 건수</span></th>
-      <th>전달 대비 해소<br><span style="font-weight:400;opacity:.7;font-size:10px">건수 변화</span></th>
-      <th>미수료해소건<br><span style="font-weight:400;opacity:.7;font-size:10px">1회차 수강 완료</span></th>
-      <th>신규 정착률<br><span style="font-weight:400;opacity:.7;font-size:10px">화이트벨트 기준</span></th>
-    </tr></thead><tbody>`;
-    [...mh].reverse().slice(0,6).reverse().forEach(row => {
+    const recent6 = [...mh].reverse().slice(0,6).reverse();
+    const latest = recent6[recent6.length - 1] || {};
+
+    // ── 최신 월 KPI 타일 4개 ──
+    const incDelta = latest.incomplete_delta;
+    const incDeltaTxt = incDelta == null ? '전월 비교 없음'
+      : incDelta < 0 ? `▼ ${Math.abs(incDelta)}건 해소`
+      : incDelta > 0 ? `▲ ${incDelta}건 증가` : '변동 없음';
+    const incDeltaColor = incDelta == null ? '#94a3b8' : incDelta < 0 ? '#16a34a' : incDelta > 0 ? '#dc2626' : '#94a3b8';
+    const reEduColor = latest.re_edu_ratio == null ? '#94a3b8'
+      : latest.re_edu_ratio >= 30 ? '#dc2626' : latest.re_edu_ratio >= 15 ? '#d97706' : '#16a34a';
+    const retColor = latest.retention_rate == null ? '#94a3b8'
+      : latest.retention_rate >= 80 ? '#16a34a' : latest.retention_rate >= 50 ? '#d97706' : '#dc2626';
+
+    const kpis = [
+      { label:'미수료 적체', val: latest.incomplete != null ? latest.incomplete.toLocaleString()+'건' : '-', sub: incDeltaTxt, subColor: incDeltaColor, bg:'#fff5f5', border:'#fecaca', valColor:'#dc2626' },
+      { label:'미수료해소건', val: latest.completion != null ? latest.completion+'건' : '-', sub:'이달 1회차 수강 완료', subColor:'#94a3b8', bg:'#f0fdf4', border:'#bbf7d0', valColor:'#16a34a' },
+      { label:'재교육 필요 비율', val: latest.re_edu_ratio != null ? latest.re_edu_ratio+'%' : '-', sub:'70점 미만 평가', subColor:'#94a3b8', bg:'#fffbeb', border:'#fde68a', valColor: reEduColor },
+      { label:'신규 정착률', val: latest.retention_rate != null ? latest.retention_rate+'%' : '-', sub:'화이트벨트 기준', subColor:'#94a3b8', bg:'#faf5ff', border:'#e9d5ff', valColor: retColor },
+    ];
+
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">`;
+    kpis.forEach(k => {
+      html += `<div style="background:${k.bg};border:1px solid ${k.border};border-radius:12px;padding:14px 16px">
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.3px;margin-bottom:6px">${k.label}</div>
+        <div style="font-size:28px;font-weight:900;color:${k.valColor};line-height:1.1">${k.val}</div>
+        <div style="font-size:10px;color:${k.subColor};margin-top:4px">${k.sub}</div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // ── 차트 2열: 미수료 적체 | 재교육·정착률 ──
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;padding:16px">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px">미수료 적체 추이</div>
+        <div style="position:relative;height:160px"><canvas id="mhChart1"></canvas></div>
+      </div>
+      <div style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;padding:16px">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px">재교육 필요 비율 · 신규 정착률</div>
+        <div style="position:relative;height:160px"><canvas id="mhChart2"></canvas></div>
+      </div>
+    </div>`;
+
+    // ── 미수료해소건 막대 차트 ──
+    html += `<div style="background:#fff;border:1px solid #e8ecf0;border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:10px">미수료해소건 월별 추이 <span style="font-size:10px;font-weight:400;color:#94a3b8">— 1회차 수강 완료 건수</span></div>
+      <div style="position:relative;height:90px"><canvas id="mhChart3"></canvas></div>
+    </div>`;
+
+    // ── 상세 테이블 (접기) ──
+    html += `<button id="mhTableBtn" onclick="toggleMhTable()"
+      style="width:100%;padding:8px 14px;background:#f8fafc;border:1px solid #e8ecf0;border-radius:8px;color:#64748b;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;margin-bottom:0">
+      상세 수치 보기 ▾
+    </button>
+    <div id="mhTableWrap" style="display:none;margin-top:8px">
+      <table class="data-table"><thead><tr>
+        <th style="min-width:80px;text-align:left">월</th>
+        <th>재교육 비율</th>
+        <th>미수료 적체</th>
+        <th>전달 대비</th>
+        <th>미수료해소건</th>
+        <th>신규 정착률</th>
+      </tr></thead><tbody>`;
+
+    recent6.forEach(row => {
       const isCurr = row.month === cm;
       const mLabel = row.month.replace('-', '년 ') + '월';
       const badge = isCurr ? `<span class="month-chip">이번 달</span>` : '';
@@ -628,8 +685,10 @@ function render(data) {
         <td>${retHtml}</td>
       </tr>`;
     });
+
     html += `</tbody></table>`;
     if (mh.length > 6) html += `<div style="font-size:11px;color:#64748b;text-align:right;margin-top:6px">최근 6개월 표시 · 전체 ${mh.length}개월 저장됨</div>`;
+    html += `</div>`; // mhTableWrap
   }
   html += `</div>`;
 
@@ -698,6 +757,124 @@ function render(data) {
   html += `</div></div>`; // card-body + 월간 report-card
 
   document.getElementById('mainContent').innerHTML = html;
+  setTimeout(() => initMhCharts(mh, cm), 0);
+}
+
+function toggleMhTable() {
+  const wrap = document.getElementById('mhTableWrap');
+  const btn  = document.getElementById('mhTableBtn');
+  if (!wrap) return;
+  const open = wrap.style.display !== 'none';
+  wrap.style.display = open ? 'none' : 'block';
+  if (btn) btn.textContent = open ? '상세 수치 보기 ▾' : '상세 수치 닫기 ▴';
+}
+
+function initMhCharts(mh, cm) {
+  if (!window.Chart || !mh || !mh.length) return;
+  ['_mhC1','_mhC2','_mhC3'].forEach(k => {
+    if (window[k]) { try { window[k].destroy(); } catch(e) {} window[k] = null; }
+  });
+
+  const recent = [...mh].reverse().slice(0,6).reverse();
+  const labels = recent.map(r => parseInt(r.month.slice(5)) + '월');
+
+  const base = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { font: { size: 10 }, boxWidth: 10, padding: 8 } },
+      tooltip: { titleFont: { size: 11 }, bodyFont: { size: 11 } }
+    },
+    scales: {
+      x: { ticks: { font: { size: 10 }, color: '#94a3b8' }, grid: { display: false } },
+      y: { ticks: { font: { size: 10 }, color: '#94a3b8' }, grid: { color: '#f1f5f9' } }
+    }
+  };
+
+  const c1 = document.getElementById('mhChart1');
+  if (c1) {
+    window._mhC1 = new Chart(c1, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: '미수료 적체',
+          data: recent.map(r => r.incomplete ?? null),
+          borderColor: '#dc2626',
+          backgroundColor: 'rgba(220,38,38,0.08)',
+          fill: true, tension: 0.4,
+          pointRadius: 5, pointHoverRadius: 7,
+          pointBackgroundColor: '#dc2626',
+        }]
+      },
+      options: {
+        ...base,
+        plugins: { ...base.plugins, legend: { display: false } },
+        scales: {
+          ...base.scales,
+          y: { ...base.scales.y, beginAtZero: false, ticks: { ...base.scales.y.ticks, callback: v => v.toLocaleString() } }
+        }
+      }
+    });
+  }
+
+  const c2 = document.getElementById('mhChart2');
+  if (c2) {
+    window._mhC2 = new Chart(c2, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: '재교육 필요 비율',
+            data: recent.map(r => r.re_edu_ratio ?? null),
+            borderColor: '#d97706', backgroundColor: 'transparent',
+            tension: 0.4, borderDash: [5,3],
+            pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#d97706',
+          },
+          {
+            label: '신규 정착률',
+            data: recent.map(r => r.retention_rate ?? null),
+            borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.07)',
+            fill: true, tension: 0.4,
+            pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#16a34a',
+          }
+        ]
+      },
+      options: {
+        ...base,
+        scales: {
+          ...base.scales,
+          y: { ...base.scales.y, min: 0, max: 100, ticks: { ...base.scales.y.ticks, callback: v => v + '%' } }
+        }
+      }
+    });
+  }
+
+  const c3 = document.getElementById('mhChart3');
+  if (c3) {
+    window._mhC3 = new Chart(c3, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: '미수료해소건',
+          data: recent.map(r => r.completion ?? 0),
+          backgroundColor: recent.map(r => r.month === cm ? '#1d4ed8' : '#93c5fd'),
+          borderRadius: 5,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        ...base,
+        plugins: { ...base.plugins, legend: { display: false } },
+        scales: {
+          ...base.scales,
+          y: { ...base.scales.y, beginAtZero: true, ticks: { ...base.scales.y.ticks, stepSize: 1 } }
+        }
+      }
+    });
+  }
 }
 
 function tile(label, value, sub, color) {
