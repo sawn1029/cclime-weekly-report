@@ -889,20 +889,25 @@ def collect_all(week_start_str=None):
     global _cache, _cache_ts
     now = time.time()
 
+    # 보고기준일: 오늘 날짜 (또는 파라미터로 전달된 날짜)
     if week_start_str:
         try:
-            week_start = date.fromisoformat(week_start_str)
+            ref_date = date.fromisoformat(week_start_str)
         except Exception:
-            week_start = date.today() - timedelta(days=date.today().weekday())
+            ref_date = date.today()
     else:
-        today = date.today()
-        week_start = today - timedelta(days=today.weekday())
+        ref_date = date.today()
 
-    week_end = week_start + timedelta(days=6)
-    next_week_start = week_start + timedelta(days=7)
-    next_week_end = week_start + timedelta(days=13)
+    # 데이터 기준: 전주 월요일~금요일
+    this_monday = ref_date - timedelta(days=ref_date.weekday())
+    data_start  = this_monday - timedelta(days=7)   # 전주 월요일
+    data_end    = this_monday - timedelta(days=3)   # 전주 금요일
+    week_start  = data_start
+    week_end    = data_end
+    next_week_start = this_monday                        # 이번 주 월요일
+    next_week_end   = this_monday + timedelta(days=4)    # 이번 주 금요일
 
-    cache_key = week_start.isoformat()
+    cache_key = ref_date.isoformat()
     if _cache.get('_key') == cache_key and now - _cache_ts < CACHE_TTL:
         return _cache
 
@@ -1078,9 +1083,11 @@ def collect_all(week_start_str=None):
         '_key': cache_key,
         'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'week': {
-            'start': week_start.isoformat(),
-            'end': week_end.isoformat(),
-            'label': f"{week_start.year}년 {week_start.month}월 {week_start.day}일 ~ {week_end.month}월 {week_end.day}일",
+            'start':      ref_date.isoformat(),        # 보고기준일
+            'end':        ref_date.isoformat(),
+            'data_start': data_start.isoformat(),      # 전주 월요일
+            'data_end':   data_end.isoformat(),        # 전주 금요일
+            'label': f"보고기준일 {ref_date.month}/{ref_date.day} · 데이터 {data_start.month}/{data_start.day}(월)~{data_end.month}/{data_end.day}(금)",
         },
         'dashboard': dash_data,
         'courses': courses_data,

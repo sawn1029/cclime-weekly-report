@@ -218,7 +218,7 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
 <div class="page-header">
   <div class="brand">끌리메 <span>·</span> 교육팀</div>
   <div class="date-picker-wrap">
-    <label>기준 주간</label>
+    <label>보고기준일</label>
     <button class="date-nav" onclick="moveWeek(-1)">‹</button>
     <input type="date" class="date-input" id="datePicker" onchange="onDatePick()">
     <button class="date-nav" onclick="moveWeek(1)">›</button>
@@ -242,33 +242,34 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
 </div>
 
 <script>
-let currentWeekStart = getWeekStart(new Date());
+let currentWeekStart = new Date();
 let _taskExpanded = false;
 
-function getWeekStart(d) {
-  const day = new Date(d);
-  const dow = day.getDay();
-  day.setDate(day.getDate() + (dow === 0 ? -6 : 1 - dow));
-  day.setHours(0,0,0,0);
-  return day;
-}
 function toISO(d) { return d.toISOString().split('T')[0]; }
 
-function weekRangeLabel(ws) {
-  const we = new Date(ws); we.setDate(we.getDate() + 6);
-  const thisWs = getWeekStart(new Date());
-  let tag = '';
-  if (toISO(ws) === toISO(thisWs)) tag = ' · 이번 주';
-  else if (toISO(ws) === toISO(new Date(thisWs.getTime() + 7*864e5))) tag = ' · 다음 주';
-  else if (toISO(ws) === toISO(new Date(thisWs.getTime() - 7*864e5))) tag = ' · 지난 주';
-  return `${ws.getMonth()+1}/${ws.getDate()} ~ ${we.getMonth()+1}/${we.getDate()}${tag}`;
+// 보고기준일(ref)로부터 데이터 기준 전주 월요일 반환
+function getDataStart(ref) {
+  const r = new Date(ref);
+  const dow = r.getDay(); // 0=Sun,1=Mon,...
+  const daysSinceMon = (dow === 0) ? 6 : dow - 1;
+  const thisMon = new Date(r); thisMon.setDate(r.getDate() - daysSinceMon);
+  const prevMon = new Date(thisMon); prevMon.setDate(thisMon.getDate() - 7);
+  return prevMon;
+}
+
+function weekRangeLabel(ref) {
+  const ds = getDataStart(ref);
+  const de = new Date(ds); de.setDate(ds.getDate() + 4); // 전주 금요일
+  const todayISO = toISO(new Date());
+  const tag = toISO(ref) === todayISO ? ' · 이번 보고' : '';
+  return `전주 ${ds.getMonth()+1}/${ds.getDate()}(월)~${de.getMonth()+1}/${de.getDate()}(금)${tag}`;
 }
 
 function moveWeek(delta) { currentWeekStart = new Date(currentWeekStart.getTime() + delta*7*864e5); loadData(); }
-function goToday() { currentWeekStart = getWeekStart(new Date()); loadData(); }
+function goToday() { currentWeekStart = new Date(); loadData(); }
 function onDatePick() {
   const v = document.getElementById('datePicker').value;
-  if (v) { currentWeekStart = getWeekStart(new Date(v + 'T12:00:00')); loadData(); }
+  if (v) { currentWeekStart = new Date(v + 'T12:00:00'); loadData(); }
 }
 
 async function loadData() {
@@ -335,7 +336,7 @@ function render(data) {
     <div class="card-header">
       <span class="card-tag weekly">끌리메 주간보고</span>
       <div class="card-title"><div class="card-title-dot"></div>이번 주 교육 현황</div>
-      <span style="margin-left:auto;font-size:11px;color:#8b949e">${data.week.start} ~ ${data.week.end}</span>
+      <span style="margin-left:auto;font-size:11px;color:#8b949e">보고기준일 ${data.week.start} · 데이터 ${data.week.data_start}~${data.week.data_end}</span>
     </div>
     <div class="card-body">`;
 
