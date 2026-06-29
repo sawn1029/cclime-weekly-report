@@ -1029,6 +1029,12 @@ def collect_all(week_start_str=None):
     # 수동 확정 월은 상수값으로 대체 (라이브 데이터 무시)
     if current_month in LOCKED_TYPE_STATS:
         monthly_type_stats = LOCKED_TYPE_STATS[current_month]
+        # 헤더 이달 누적 수치도 고정값으로 덮어씀
+        locked_students  = sum(v.get('enrolled', 0) for v in monthly_type_stats.values())
+        locked_graduates = sum(v.get('attended', 0) for v in monthly_type_stats.values())
+        dash_data.setdefault('stats', {})
+        dash_data['stats']['students']  = locked_students
+        dash_data['stats']['graduates'] = locked_graduates
 
     monthly_completion = sum(v.get('first_time', 0) for k, v in monthly_type_stats.items() if k != '특별 교육')
     save_monthly_metric('monthly_completion', monthly_completion)
