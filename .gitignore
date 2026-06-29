@@ -5,6 +5,7 @@ config.py
 server.pid
 server.log
 history.json
+irr_tasks.json
 __pycache__/
 *.pyc
 

@@ -1217,6 +1217,40 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+def _startup_restore_irr():
+    """서버 시작 시 GitHub API에서 irr_tasks.json 복원 (Railway 재배포 대비)"""
+    if not _GH_TOKEN:
+        return
+    # 로컬 파일에 실제 데이터가 있으면 복원 불필요
+    if os.path.exists(IRR_FILE):
+        try:
+            with open(IRR_FILE, 'r') as f:
+                existing = json.load(f)
+            if isinstance(existing, dict) and existing:
+                return
+            if isinstance(existing, list) and existing:
+                return
+        except Exception:
+            pass
+    try:
+        headers = {
+            'Authorization': f'token {_GH_TOKEN}',
+            'Accept': 'application/vnd.github.v3+json',
+        }
+        url = f'https://api.github.com/repos/{_GH_OWNER}/{_GH_REPO}/contents/{_GH_PATH}'
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.ok:
+            content = _b64.b64decode(r.json()['content']).decode()
+            data = json.loads(content)
+            # 딕셔너리이고 실제 데이터가 있을 때만 복원
+            if isinstance(data, dict) and data:
+                with open(IRR_FILE, 'w') as f:
+                    f.write(content)
+                print(f"✅ GitHub에서 비정기 업무 데이터 복원 완료 ({len(data)} 주차)")
+    except Exception as e:
+        print(f"⚠️ GitHub IRR 복원 실패: {e}")
+
 if __name__ == '__main__':
+    _startup_restore_irr()
     print(f"✅ 주간보고 서버 시작: http://localhost:{PORT}")
     HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
