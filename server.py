@@ -279,11 +279,27 @@ def fetch_course_stats(session, course_id):
             and len(bool_pairs.get(app_id, [])) >= 2
             and bool_pairs[app_id][1]
         )
-        stats = {'enrolled': enrolled, 'attended': attended, 'first_time': first_time}
+
+        # applicationId → 이름 매핑 (윈도우 탐색)
+        id_to_name = {}
+        for m in re.finditer(r'"applicationId"\s*:\s*"([^"]+)"', full):
+            app_id = m.group(1)
+            seg = full[max(0, m.start()-300): m.end()+300]
+            nm = re.search(r'"name"\s*:\s*"([^"]+)"', seg)
+            if nm:
+                id_to_name[app_id] = nm.group(1)
+        absent_names = sorted({
+            id_to_name[aid]
+            for aid, status in attend_map.items()
+            if status != '참석' and aid in id_to_name
+        })
+
+        stats = {'enrolled': enrolled, 'attended': attended, 'first_time': first_time,
+                 'absent_names': absent_names}
         _course_stats_cache[course_id] = (stats, now)
         return stats
     except Exception:
-        return {'enrolled': 0, 'attended': 0, 'first_time': 0}
+        return {'enrolled': 0, 'attended': 0, 'first_time': 0, 'absent_names': []}
 
 def fetch_all_courses(session):
     global _courses_cache, _courses_cache_ts
@@ -886,6 +902,7 @@ def collect_all(week_start_str=None):
             c['enrolled'] = stats['enrolled']
             c['attended'] = stats['attended']
             c['first_time'] = stats.get('first_time', 0)
+            c['absent_names'] = stats.get('absent_names', [])
             weekly_enrolled += stats['enrolled']
             weekly_attended += stats['attended']
             weekly_first_time += stats.get('first_time', 0)

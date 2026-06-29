@@ -911,12 +911,39 @@ function courseRow(cr, dotColor, showStats) {
   const dateStr = cr.startDate === cr.endDate ? cr.startDate : `${cr.startDate} ~ ${cr.endDate}`;
   const stats = showStats && cr.enrolled !== undefined
     ? `<span class="c-stats">${cr.enrolled}명 신청 · ${cr.attended}명 참석</span>` : '';
-  return `<div class="course-row">
-    <div class="c-dot" style="background:${dotColor}"></div>
-    <div class="c-title">${cr.title}</div>
-    <div class="c-date">${dateStr}</div>
-    ${stats}
-    <div class="c-type">${cr.type || '아카데미'}</div>
+
+  const absentNames = (showStats && cr.absent_names && cr.absent_names.length) ? cr.absent_names : [];
+  const absentDiff  = showStats && cr.enrolled !== undefined ? (cr.enrolled - cr.attended) : 0;
+  const uid = 'ab_' + (cr.id || Math.random().toString(36).slice(2));
+
+  let absentHtml = '';
+  if (absentDiff > 0) {
+    if (absentNames.length > 0) {
+      absentHtml = `
+        <div style="margin-top:4px;padding-left:14px">
+          <button onclick="(function(b,p){p.style.display=p.style.display==='none'?'block':'none';b.textContent=p.style.display==='none'?'미참석·미수료 ${absentDiff}명 ▾':'미참석·미수료 ${absentDiff}명 ▴'})(this,document.getElementById('${uid}'))"
+            style="background:none;border:none;padding:0;font-size:11px;color:#94a3b8;cursor:pointer;font-family:inherit;font-weight:600">미참석·미수료 ${absentDiff}명 ▾</button>
+          <div id="${uid}" style="display:none;margin-top:4px;padding:6px 10px;background:#fafafa;border-radius:6px;border:1px solid #f1f5f9">
+            <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:4px;letter-spacing:.3px">미참석 · 미수료</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">
+              ${absentNames.map(n => `<span style="font-size:11px;padding:2px 8px;background:#fff;border:1px solid #e8ecf0;border-radius:12px;color:#475569">${n}</span>`).join('')}
+            </div>
+          </div>
+        </div>`;
+    } else {
+      absentHtml = `<div style="margin-top:2px;padding-left:14px;font-size:11px;color:#cbd5e1">미참석·미수료 ${absentDiff}명</div>`;
+    }
+  }
+
+  return `<div class="course-row" style="flex-direction:column;align-items:flex-start;padding:10px 14px">
+    <div style="display:flex;align-items:center;gap:8px;width:100%">
+      <div class="c-dot" style="background:${dotColor};flex-shrink:0"></div>
+      <div class="c-title">${cr.title}</div>
+      <div class="c-date">${dateStr}</div>
+      ${stats}
+      <div class="c-type">${cr.type || '아카데미'}</div>
+    </div>
+    ${absentHtml}
   </div>`;
 }
 
