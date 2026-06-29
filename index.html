@@ -273,6 +273,7 @@ function onDatePick() {
 
 async function loadData() {
   document.getElementById('weekLabel').textContent = weekRangeLabel(currentWeekStart) + '  로딩 중...';
+  irrLoadFromServer();  // 주차 이동 시 비정기 업무도 함께 갱신
   try {
     const res = await fetch(`/api/weekly?weekStart=${toISO(currentWeekStart)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -956,10 +957,12 @@ const IRR_BG     = { 예정:'#dbeafe', 진행중:'#fef3c7', 완료:'#dcfce7', �
 
 let _irrRows = [];
 let _irrAdmin = sessionStorage.getItem('irr_admin') || '';
+let _irrWeek  = '';
 
 async function irrLoadFromServer() {
+  _irrWeek = toISO(currentWeekStart);
   try {
-    const res = await fetch('/api/irr_tasks');
+    const res = await fetch(`/api/irr_tasks?week=${_irrWeek}`);
     _irrRows = await res.json();
   } catch { _irrRows = []; }
   renderIrregular();
@@ -969,7 +972,7 @@ async function irrPost(body) {
   const res = await fetch('/api/irr_tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, password: _irrAdmin })
+    body: JSON.stringify({ ...body, password: _irrAdmin, week_start: _irrWeek })
   });
   const data = await res.json();
   if (res.status === 403) { alert('비밀번호가 틀렸습니다.'); _irrAdmin = ''; sessionStorage.removeItem('irr_admin'); renderIrregular(); return false; }

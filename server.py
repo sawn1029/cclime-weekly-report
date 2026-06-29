@@ -560,15 +560,22 @@ def _save_history(history):
 import base64 as _b64
 
 def load_irr_tasks():
-    """irr_tasks.json에서 읽기 (없으면 history.json fallback)"""
+    """irr_tasks.json 전체 딕셔너리 반환 {week_start: [tasks]}"""
     if os.path.exists(IRR_FILE):
         try:
             with open(IRR_FILE, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+            # 구버전(리스트) → 딕셔너리 자동 변환
+            if isinstance(data, list):
+                return {}
+            return data
         except Exception:
             pass
-    # 구버전 fallback
-    return _load_history().get('irr_tasks', [])
+    return {}
+
+def load_irr_week(week_start):
+    """특정 주차 태스크만 반환"""
+    return load_irr_tasks().get(week_start, [])
 
 def save_irr_tasks(tasks):
     """irr_tasks.json 저장 후 GitHub API로 자동 커밋"""
@@ -1104,7 +1111,8 @@ class Handler(BaseHTTPRequestHandler):
             week_start = params.get('weekStart', [None])[0]
             self._serve_api(week_start)
         elif path == '/api/irr_tasks':
-            self._json(load_irr_tasks())
+            week = params.get('week', [None])[0] or ''
+            self._json(load_irr_week(week))
         elif path == '/api/refresh':
             global _cache, _cache_ts, _courses_cache, _courses_cache_ts
             global _cancelled_cache, _cancelled_cache_ts, _course_stats_cache, _eval_cache, _eval_cache_ts
@@ -1135,8 +1143,10 @@ class Handler(BaseHTTPRequestHandler):
             if body.get('password') != ADMIN_PASSWORD:
                 self._json({'error': '비밀번호가 틀렸습니다'}, 403)
                 return
-            tasks = load_irr_tasks()
-            action = body.get('action')
+            week_start = body.get('week_start', '')
+            all_data   = load_irr_tasks()
+            tasks      = all_data.get(week_start, [])
+            action     = body.get('action')
             if action == 'add':
                 tasks.append(body.get('task', {}))
             elif action == 'update':
@@ -1147,7 +1157,8 @@ class Handler(BaseHTTPRequestHandler):
                 idx = body.get('idx', -1)
                 if 0 <= idx < len(tasks):
                     tasks.pop(idx)
-            save_irr_tasks(tasks)
+            all_data[week_start] = tasks
+            save_irr_tasks(all_data)
             self._json({'ok': True, 'tasks': tasks})
         else:
             self.send_response(404)
