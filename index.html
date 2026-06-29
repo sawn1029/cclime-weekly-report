@@ -347,7 +347,7 @@ function render(data) {
   // ── 한 줄 결론 배너 ──
   const goodTags  = [], alertTags = [];
   if (wRate === 100 && (ws.attended ?? 0) > 0) goodTags.push('양호');
-  if (!(ws.completion) && (data.total_incomplete ?? 0) > 0) alertTags.push('미수료 해소 미진행');
+  if (!(ws.completion)) alertTags.push('미수료 해소 미진행');
 
   const badgeHtml = [
     ...goodTags.map(t => `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:800;color:#166534;background:#dcfce7">${t}</span>`),
@@ -357,9 +357,6 @@ function render(data) {
   let summaryText = `교육 ${ws.course_count ?? 0}건 진행`;
   if ((ws.enrolled ?? 0) > 0) {
     summaryText += `·${ws.attended}명${ws.attended === ws.enrolled ? ' 전원' : '/' + ws.enrolled + '명'} 수료`;
-  }
-  if ((data.total_incomplete ?? 0) > 0) {
-    summaryText += `. 미수료 백로그 ${data.total_incomplete}건 그대로.`;
   }
 
   html += `<div style="border-left:3px solid #f59e0b;background:#fffbeb;padding:12px 16px;margin-bottom:16px;border-radius:0 10px 10px 0">
@@ -398,7 +395,7 @@ function render(data) {
       <div class="tile" style="background:${(ws.completion ?? 0) > 0 ? '#f0fdfa' : '#fffbeb'}">
         <div class="tile-lbl">미수료 해소</div>
         <div class="tile-val" style="color:${(ws.completion ?? 0) > 0 ? '#0f766e' : '#92400e'}">${ws.completion ?? 0}건</div>
-        <div class="tile-sub" style="color:${(ws.completion ?? 0) > 0 ? '#0f766e' : '#d97706'};font-weight:700">${(ws.completion ?? 0) > 0 ? '1회차 수료' : '미진행'} · 백로그 ${data.total_incomplete ?? '-'}건</div>
+        <div class="tile-sub" style="color:${(ws.completion ?? 0) > 0 ? '#0f766e' : '#d97706'};font-weight:700">${(ws.completion ?? 0) > 0 ? '1회차 수료' : '미진행'}</div>
       </div>
     </div>
   </div>`;
@@ -515,51 +512,50 @@ function render(data) {
   const allTypes = [...knownTypes, ...otherTypes];
 
   html += `<div class="section-block">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px">
-      <div style="font-size:13px;font-weight:800;color:#1a202c">교육 전환 <span style="font-size:11px;font-weight:400;color:#94a3b8">· 등록 → 참석 → 수료</span></div>
-      <div style="font-size:11px;color:#94a3b8">이달 누적 ${cm}</div>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:800;color:#1a202c">이달 교육 현황</div>
+      <div style="font-size:11px;color:#94a3b8">${cm}</div>
     </div>`;
 
   if (allTypes.length > 0) {
-    allTypes.forEach(typeName => {
+    allTypes.forEach((typeName, ti) => {
       const s = mts[typeName];
       if (!s) return;
-      const rows = [
-        { label:'등록', val: s.enrolled,       pct: 100 },
-        { label:'참석', val: s.attended,        pct: s.enrolled > 0 ? Math.round(s.attended / s.enrolled * 100) : 0 },
-        { label:'수료', val: s.first_time ?? 0, pct: s.enrolled > 0 ? Math.round((s.first_time ?? 0) / s.enrolled * 100) : 0 },
-      ];
-      html += `<div style="margin-bottom:20px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-          <div style="width:6px;height:6px;border-radius:50%;background:#1C3557;flex-shrink:0"></div>
-          <div style="font-size:12px;font-weight:700;color:#475569">${typeName} <span style="font-weight:400;color:#94a3b8">${s.courses}건</span></div>
-        </div>`;
-      rows.forEach(r => {
-        const warn = r.label === '수료' && r.pct < 50 && s.enrolled > 0;
-        html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-          <div style="width:36px;font-size:11px;color:#94a3b8;text-align:right;flex-shrink:0">${r.label}</div>
-          <div style="flex:1;height:20px;background:#f1f5f9;border-radius:3px;overflow:hidden">
-            <div style="height:100%;width:${r.pct}%;background:#1C3557;border-radius:3px"></div>
+      const isAcademy = typeName === '아카데미 교육';
+      const attendPct = s.enrolled > 0 ? Math.round(s.attended / s.enrolled * 100) : 0;
+      const firstPct  = s.enrolled > 0 ? Math.round((s.first_time ?? 0) / s.enrolled * 100) : 0;
+      html += `<div style="display:flex;align-items:center;gap:0;padding:11px 0;${ti < allTypes.length - 1 ? 'border-bottom:1px solid #f1f5f9' : ''}">
+        <div style="font-size:12px;font-weight:700;color:#334155;min-width:90px;flex-shrink:0">${typeName}</div>
+        <div style="display:flex;gap:0;flex:1;flex-wrap:wrap">
+          <div style="min-width:72px;text-align:center">
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">신청</div>
+            <div style="font-size:18px;font-weight:800;color:#1a202c;line-height:1">${s.enrolled}<span style="font-size:11px;font-weight:400;color:#94a3b8">명</span></div>
           </div>
-          <div style="width:80px;font-size:12px;font-weight:700;color:${warn ? '#d97706' : '#334155'};flex-shrink:0">${r.val}명${r.label !== '등록' ? ' · ' + r.pct + '%' : ''}</div>
-        </div>`;
-      });
-      html += `</div>`;
+          <div style="min-width:12px;display:flex;align-items:center;padding-top:12px;color:#d1d5db;font-size:11px">›</div>
+          <div style="min-width:72px;text-align:center">
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">${isAcademy ? '참석' : '수료'}</div>
+            <div style="font-size:18px;font-weight:800;color:#1a202c;line-height:1">${s.attended}<span style="font-size:11px;font-weight:400;color:#94a3b8">명</span>${attendPct < 100 ? `<span style="font-size:10px;color:#94a3b8;font-weight:400;margin-left:2px">${attendPct}%</span>` : ''}</div>
+          </div>
+          ${isAcademy ? `
+          <div style="min-width:12px;display:flex;align-items:center;padding-top:12px;color:#d1d5db;font-size:11px">›</div>
+          <div style="min-width:72px;text-align:center">
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">1회차</div>
+            <div style="font-size:18px;font-weight:800;color:#1a202c;line-height:1">${s.first_time ?? 0}<span style="font-size:11px;font-weight:400;color:#94a3b8">명</span>${firstPct > 0 ? `<span style="font-size:10px;color:#94a3b8;font-weight:400;margin-left:2px">${firstPct}%</span>` : ''}</div>
+          </div>` : ''}
+        </div>
+      </div>`;
     });
-    html += `<div style="background:#f8fafc;border:1px solid #e8ecf0;border-radius:8px;padding:8px 14px;font-size:11px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap">
-      <span style="font-weight:700;color:#475569">실인원 (중복제거)</span>
-      <span>교육생 <strong style="color:#334155">${ds.students ?? '-'}명</strong></span>
-      <span>수료인원 <strong style="color:#334155">${ds.graduates ?? '-'}명</strong></span>
-      <span style="color:#94a3b8">※ 한 명이 여러 교육 수강 시 건수는 중복 집계됩니다</span>
-    </div>`;
+    if (ds.students || ds.graduates) {
+      html += `<div style="padding-top:8px;font-size:11px;color:#94a3b8;border-top:1px solid #f1f5f9">실인원(중복제거) · 교육생 <strong style="color:#64748b">${ds.students ?? '-'}명</strong> · 수료 <strong style="color:#64748b">${ds.graduates ?? '-'}명</strong></div>`;
+    }
   } else {
     html += `<div style="color:#94a3b8;font-size:13px;padding:16px 0">이달 교육 데이터가 없습니다</div>`;
   }
 
-  html += `<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e8ecf0;border-radius:8px;background:#fff">
+  html += `<div style="margin-top:10px;display:flex;align-items:baseline;gap:10px;padding-top:10px;border-top:1px solid #f1f5f9">
     <span style="font-size:12px;font-weight:700;color:#64748b">당월 미수료해소건</span>
-    <span style="font-size:20px;font-weight:900;color:#334155">${mc}건</span>
-    <span style="font-size:11px;color:#94a3b8">1회차 수강 누적</span>
+    <span style="font-size:22px;font-weight:900;color:#334155">${mc}건</span>
+    <span style="font-size:11px;color:#94a3b8">아카데미 1회차 수강 완료</span>
   </div>
   </div>`;
 
@@ -681,11 +677,6 @@ function render(data) {
     const latest = recent6[recent6.length - 1] || {};
 
     // ── 최신 월 KPI 타일 4개 ──
-    const incDelta = latest.incomplete_delta;
-    const incDeltaTxt = incDelta == null ? '전월 비교 없음'
-      : incDelta < 0 ? `▼ ${Math.abs(incDelta)}건 해소`
-      : incDelta > 0 ? `▲ ${incDelta}건 증가` : '변동 없음';
-    const incDeltaColor = incDelta == null ? '#94a3b8' : incDelta < 0 ? '#16a34a' : incDelta > 0 ? '#dc2626' : '#94a3b8';
     const reEduColor = latest.re_edu_ratio == null ? '#94a3b8'
       : latest.re_edu_ratio >= 30 ? '#dc2626' : latest.re_edu_ratio >= 15 ? '#d97706' : '#16a34a';
     const retColor = latest.retention_rate == null ? '#94a3b8'
