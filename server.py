@@ -35,6 +35,13 @@ EVAL_CACHE_TTL   = 3600
 _BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 HTML_PATH    = os.path.join(_BASE_DIR, 'index.html')
 HISTORY_FILE = os.path.join(_BASE_DIR, 'history.json')
+IRR_FILE     = os.path.join(_BASE_DIR, 'irr_tasks.json')
+
+# GitHub API 자동 커밋 (GITHUB_TOKEN 환경변수 설정 시 활성화)
+_GH_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+_GH_OWNER = 'sawn1029'
+_GH_REPO  = 'cclime-weekly-report'
+_GH_PATH  = 'irr_tasks.json'
 
 try:
     ROSTER_SHEET_ID     = _cfg.ROSTER_SHEET_ID
@@ -549,6 +556,50 @@ def _save_history(history):
     except Exception:
         pass
 
+# ─── 비정기 주요업무 영구 저장 ─────────────────────────
+import base64 as _b64
+
+def load_irr_tasks():
+    """irr_tasks.json에서 읽기 (없으면 history.json fallback)"""
+    if os.path.exists(IRR_FILE):
+        try:
+            with open(IRR_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # 구버전 fallback
+    return _load_history().get('irr_tasks', [])
+
+def save_irr_tasks(tasks):
+    """irr_tasks.json 저장 후 GitHub API로 자동 커밋"""
+    content = json.dumps(tasks, ensure_ascii=False, indent=2)
+    try:
+        with open(IRR_FILE, 'w') as f:
+            f.write(content)
+    except Exception:
+        pass
+    # GitHub API 커밋 (GITHUB_TOKEN 있을 때만)
+    if not _GH_TOKEN:
+        return
+    try:
+        headers = {
+            'Authorization': f'token {_GH_TOKEN}',
+            'Accept': 'application/vnd.github.v3+json',
+        }
+        url = f'https://api.github.com/repos/{_GH_OWNER}/{_GH_REPO}/contents/{_GH_PATH}'
+        r = requests.get(url, headers=headers, timeout=10)
+        sha = r.json().get('sha', '') if r.ok else ''
+        payload = {
+            'message': '자동저장: 비정기 주요업무',
+            'content': _b64.b64encode(content.encode()).decode(),
+            'committer': {'name': '끌리메 서버', 'email': 'auto@cclime.kr'},
+        }
+        if sha:
+            payload['sha'] = sha
+        requests.put(url, json=payload, headers=headers, timeout=15)
+    except Exception:
+        pass
+
 def save_monthly_metric(key, value):
     """당월 지표값을 history.json에 저장 (월 1회 누적)"""
     if value is None:
@@ -1053,8 +1104,7 @@ class Handler(BaseHTTPRequestHandler):
             week_start = params.get('weekStart', [None])[0]
             self._serve_api(week_start)
         elif path == '/api/irr_tasks':
-            data = _load_history()
-            self._json(data.get('irr_tasks', []))
+            self._json(load_irr_tasks())
         elif path == '/api/refresh':
             global _cache, _cache_ts, _courses_cache, _courses_cache_ts
             global _cancelled_cache, _cancelled_cache_ts, _course_stats_cache, _eval_cache, _eval_cache_ts
@@ -1085,8 +1135,7 @@ class Handler(BaseHTTPRequestHandler):
             if body.get('password') != ADMIN_PASSWORD:
                 self._json({'error': '비밀번호가 틀렸습니다'}, 403)
                 return
-            data = _load_history()
-            tasks = data.get('irr_tasks', [])
+            tasks = load_irr_tasks()
             action = body.get('action')
             if action == 'add':
                 tasks.append(body.get('task', {}))
@@ -1098,8 +1147,7 @@ class Handler(BaseHTTPRequestHandler):
                 idx = body.get('idx', -1)
                 if 0 <= idx < len(tasks):
                     tasks.pop(idx)
-            data['irr_tasks'] = tasks
-            _save_history(data)
+            save_irr_tasks(tasks)
             self._json({'ok': True, 'tasks': tasks})
         else:
             self.send_response(404)
