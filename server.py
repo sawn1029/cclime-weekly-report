@@ -50,6 +50,15 @@ ROSTER_CACHE_TTL = 300
 
 EXCLUDE_TITLES = {'테스트입니다', '업로드 테스트', '액티브리페어', '윤곽관리'}
 
+# 수동 확정 월 데이터: 라이브 집계 대신 아래 값을 사용하고 덮어쓰지 않음
+# 새 달이 지나 데이터가 안정화되면 이 딕셔너리에 추가할 것
+LOCKED_TYPE_STATS = {
+    '2026-06': {
+        '아카데미 교육': {'courses': 0, 'enrolled': 32, 'attended': 32, 'first_time': 10},
+        '특별 교육':    {'courses': 0, 'enrolled': 22, 'attended': 18, 'first_time': 18},
+    },
+}
+
 PROGRAMS = [
     'DMTS/더마리젠', 'RbL데콜테/석고', '골드상하체후면', '골드페이스라인',
     '끌링 작은얼굴 이목구비', '끌링 코어 트레이닝', '뉴작은얼굴', '바스트 상체라인',
@@ -928,16 +937,20 @@ def collect_all(week_start_str=None):
                 pass
 
     current_month = date.today().strftime('%Y-%m')
+
+    # 수동 확정 월은 상수값으로 대체 (라이브 데이터 무시)
+    if current_month in LOCKED_TYPE_STATS:
+        monthly_type_stats = LOCKED_TYPE_STATS[current_month]
+
+    monthly_completion = sum(v.get('first_time', 0) for k, v in monthly_type_stats.items() if k != '특별 교육')
+    save_monthly_metric('monthly_completion', monthly_completion)
+
     total_programs_count = len(PROGRAMS)
     total_incomplete = sum(
         total_programs_count - len(s.get('completedPrograms', []))
         for s in staff_data
     )
-    # 미수료 적체 (당월 저장)
     save_monthly_metric('monthly_incomplete', total_incomplete)
-    # 미수료해소건 = 이달 1회차 수강 완료 건수 (당월 전체 교육 기준으로 직접 계산)
-    monthly_completion = sum(v.get('first_time', 0) for k, v in monthly_type_stats.items() if k != '특별 교육')
-    save_monthly_metric('monthly_completion', monthly_completion)
 
     # 벨트별 미수료 요약
     belt_summary = parse_belt_summary(staff_data)
