@@ -555,7 +555,7 @@ def get_monthly_history():
     incomplete_data  = history.get('monthly_incomplete', {})
     re_edu_data      = history.get('re_edu_ratio', {})
     retention_data   = history.get('retention_rate', {})
-    completion_cc    = history.get('completion_cases', {})
+    completion_data  = history.get('monthly_completion', {})
 
     all_months = sorted(set(
         list(incomplete_data.keys()) +
@@ -568,14 +568,13 @@ def get_monthly_history():
     for month in all_months:
         inc = incomplete_data.get(month)
         delta = (inc - prev_incomplete) if (inc is not None and prev_incomplete is not None) else None
-        monthly_comp = sum(v for k, v in completion_cc.items() if k.startswith(month))
         result.append({
             'month': month,
             'incomplete': inc,
             'incomplete_delta': delta,
             're_edu_ratio': re_edu_data.get(month),
             'retention_rate': retention_data.get(month),
-            'completion': monthly_comp if monthly_comp > 0 else None,
+            'completion': completion_data.get(month),
         })
         if inc is not None:
             prev_incomplete = inc
@@ -672,6 +671,7 @@ def compute_retention_from_roster(roster):
     - 화이트벨트: 현재 재직 중인 분자 중 벨트가 화이트인 인원
     """
     today = date.today()
+    current_month = f'{today.year:04d}-{today.month:02d}'
 
     def is_active(s):
         # 재직자 탭이면 active=True, 퇴직자 탭이면 active=False
@@ -688,6 +688,10 @@ def compute_retention_from_roster(roster):
     # 화이트벨트만 대상 (재직자·퇴직자 모두 포함)
     cohort = [s for s in roster if joined_mk(s) in ref_set and s.get('belt', '').strip() == '화이트']
     active_cohort = [s for s in cohort if is_active(s)]
+
+    # 이번달 신규입사자 (화이트벨트)
+    current_cohort = [s for s in roster if joined_mk(s) == current_month and s.get('belt', '').strip() == '화이트']
+    current_active = [s for s in current_cohort if is_active(s)]
 
     # 월별 세부 집계
     by_month = {}
@@ -722,6 +726,12 @@ def compute_retention_from_roster(roster):
         'white_active':  active_n,
         'stability':     stability,
         'all_active':    sum(1 for s in roster if s.get('active', True)),
+        'current_month': current_month,
+        'current_month_data': {
+            'total':  len(current_cohort),
+            'active': len(current_active),
+            'left':   len(current_cohort) - len(current_active),
+        },
     }
 
 # ─── 신규입사자 정착률 (당월 기준) ───────────────
@@ -886,9 +896,9 @@ def collect_all(week_start_str=None):
     )
     # 미수료 적체 (당월 저장)
     save_monthly_metric('monthly_incomplete', total_incomplete)
-    # 미수료해소건 = 1회차 수료자 (주별 누적)
-    save_weekly_completion(week_start.isoformat(), weekly_first_time)
-    monthly_completion = get_monthly_completion_total(current_month)
+    # 미수료해소건 = 이달 1회차 수강 완료 건수 (당월 전체 교육 기준으로 직접 계산)
+    monthly_completion = sum(v.get('first_time', 0) for v in monthly_type_stats.values())
+    save_monthly_metric('monthly_completion', monthly_completion)
 
     # 벨트별 미수료 요약
     belt_summary = parse_belt_summary(staff_data)
