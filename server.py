@@ -936,7 +936,7 @@ def collect_all(week_start_str=None):
     # 미수료 적체 (당월 저장)
     save_monthly_metric('monthly_incomplete', total_incomplete)
     # 미수료해소건 = 이달 1회차 수강 완료 건수 (당월 전체 교육 기준으로 직접 계산)
-    monthly_completion = sum(v.get('first_time', 0) for v in monthly_type_stats.values())
+    monthly_completion = sum(v.get('first_time', 0) for k, v in monthly_type_stats.items() if k != '특별 교육')
     save_monthly_metric('monthly_completion', monthly_completion)
 
     # 벨트별 미수료 요약
