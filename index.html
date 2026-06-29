@@ -996,7 +996,8 @@ async function irrUpdate(idx, field, val) {
   await irrPost({ action: 'update', idx, field, val });
 }
 async function irrStatusChange(idx, val) { await irrPost({ action: 'update', idx, field: 'status', val }); }
-async function irrAdd(week) { await irrPost({ action: 'add', task: { name:'', content:'', period:'', status:'진행중', note:'', week: week || '지난주' } }); }
+async function irrAdd(week) { await irrPost({ action: 'add', task: { name:'', content:'', period:'', status:'진행중', note:'', week: week || '지난주' } });
+}
 async function irrDel(idx) {
   if (!confirm('이 항목을 삭제하시겠습니까?')) return;
   await irrPost({ action: 'delete', idx });
@@ -1054,12 +1055,15 @@ function renderIrregular() {
     </div>
     <div class="card-body">`;
 
-  // week 필드 마이그레이션: 구버전('이번주'→'지난주', '다음주'→'이번주') + 미설정→'지난주'
+  // week 필드 해석: 구버전 키('이번주','다음주') → 새 키('지난주','계획')로 변환
+  // 기존 저장 데이터: week 없음 or '이번주' → 지난주 실행 내역
+  //                  '다음주' → 이번주 실행 계획
+  // 신규 저장 데이터: '지난주' or '계획' 직접 사용
   function resolveWeek(r) {
     const w = r.week;
     if (!w || w === '이번주') return '지난주';
-    if (w === '다음주') return '이번주';
-    return w; // 이미 '지난주' or '이번주'
+    if (w === '다음주') return '계획';
+    return w; // '지난주' or '계획'
   }
 
   function irrTable(group, label, weekKey) {
@@ -1125,11 +1129,11 @@ function renderIrregular() {
   }
 
   const lastWeekGroup = rows.map((r,i)=>({r,i})).filter(({r})=>resolveWeek(r)==='지난주');
-  const thisWeekGroup = rows.map((r,i)=>({r,i})).filter(({r})=>resolveWeek(r)==='이번주');
+  const thisWeekGroup = rows.map((r,i)=>({r,i})).filter(({r})=>resolveWeek(r)==='계획');
 
   html += irrTable(lastWeekGroup, '지난주 실행 내역', '지난주');
   html += `<div style="border-top:1px solid #f1f5f9;margin-bottom:16px"></div>`;
-  html += irrTable(thisWeekGroup, '이번주 실행 계획', '이번주');
+  html += irrTable(thisWeekGroup, '이번주 실행 계획', '계획');
   html += `</div></div>`;
 
   card.innerHTML = html;
