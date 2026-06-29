@@ -512,156 +512,163 @@ function render(data) {
     </div>
     <div class="card-body">`;
 
-  // 이달 누적 타일
+  // 이달 누적 · 교육 전환 (깔때기 막대)
   const mts = data.monthly_type_stats || {};
   const TYPE_ORDER = ['아카데미 교육', '특별 교육'];
-  const TYPE_COLOR = {'아카데미 교육': {bg:'#eff6ff',border:'#bfdbfe',hd:'#1e40af',num:'#1d4ed8'}, '특별 교육': {bg:'#faf5ff',border:'#e9d5ff',hd:'#6d28d9',num:'#7c3aed'}};
-  const DEFAULT_COLOR = {bg:'#f8fafc',border:'#e2e8f0',hd:'#475569',num:'#334155'};
-  // 표시할 타입 목록 (정의된 순서 + 나머지)
   const knownTypes = TYPE_ORDER.filter(t => mts[t]);
   const otherTypes = Object.keys(mts).filter(t => !TYPE_ORDER.includes(t));
   const allTypes = [...knownTypes, ...otherTypes];
 
   html += `<div class="section-block">
-    <div class="tiles-sublabel">이달 누적 <span style="color:#94a3b8;font-size:9px;font-weight:400">${cm}</span></div>`;
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:800;color:#1a202c">교육 전환 <span style="font-size:11px;font-weight:400;color:#94a3b8">· 등록 → 참석 → 수료</span></div>
+      <div style="font-size:11px;color:#94a3b8">이달 누적 ${cm}</div>
+    </div>`;
 
   if (allTypes.length > 0) {
-    html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">`;
-    allTypes.forEach(t => {
-      const s = mts[t];
-      const cl = TYPE_COLOR[t] || DEFAULT_COLOR;
-      const ft = s.first_time ?? 0;
-      html += `<div style="flex:1;min-width:180px;background:${cl.bg};border:1px solid ${cl.border};border-radius:14px;padding:16px 20px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div style="font-size:11px;font-weight:800;color:${cl.hd};letter-spacing:.3px">${t}</div>
-          <div style="font-size:10px;color:#94a3b8">${s.courses}건</div>
-        </div>
-        <div style="display:flex;gap:14px;align-items:flex-end">
-          <div>
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">등록</div>
-            <div style="font-size:28px;font-weight:900;color:${cl.num};line-height:1">${s.enrolled}</div>
-            <div style="font-size:10px;color:#94a3b8">명</div>
+    allTypes.forEach(typeName => {
+      const s = mts[typeName];
+      if (!s) return;
+      const rows = [
+        { label:'등록', val: s.enrolled,       pct: 100 },
+        { label:'참석', val: s.attended,        pct: s.enrolled > 0 ? Math.round(s.attended / s.enrolled * 100) : 0 },
+        { label:'수료', val: s.first_time ?? 0, pct: s.enrolled > 0 ? Math.round((s.first_time ?? 0) / s.enrolled * 100) : 0 },
+      ];
+      html += `<div style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <div style="width:6px;height:6px;border-radius:50%;background:#1C3557;flex-shrink:0"></div>
+          <div style="font-size:12px;font-weight:700;color:#475569">${typeName} <span style="font-weight:400;color:#94a3b8">${s.courses}건</span></div>
+        </div>`;
+      rows.forEach(r => {
+        const warn = r.label === '수료' && r.pct < 50 && s.enrolled > 0;
+        html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div style="width:36px;font-size:11px;color:#94a3b8;text-align:right;flex-shrink:0">${r.label}</div>
+          <div style="flex:1;height:20px;background:#f1f5f9;border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${r.pct}%;background:#1C3557;border-radius:3px"></div>
           </div>
-          <div style="font-size:22px;color:#e2e8f0;align-self:center">→</div>
-          <div>
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">참석완료</div>
-            <div style="font-size:28px;font-weight:900;color:${cl.num};line-height:1">${s.attended}</div>
-            <div style="font-size:10px;color:#94a3b8">명</div>
-          </div>
-          <div style="font-size:22px;color:#e2e8f0;align-self:center">→</div>
-          <div style="background:rgba(255,255,255,.7);border-radius:10px;padding:8px 12px;text-align:center">
-            <div style="font-size:10px;font-weight:700;color:#16a34a;margin-bottom:2px">1회차 수료</div>
-            <div style="font-size:26px;font-weight:900;color:#16a34a;line-height:1">${ft}</div>
-            <div style="font-size:10px;color:#94a3b8">명</div>
-          </div>
-        </div>
-      </div>`;
+          <div style="width:80px;font-size:12px;font-weight:700;color:${warn ? '#d97706' : '#334155'};flex-shrink:0">${r.val}명 · ${r.pct}%</div>
+        </div>`;
+      });
+      html += `</div>`;
     });
-    html += `</div>`;
-    // 실인원 안내 (중복 제거된 대시보드 수치)
-    html += `<div style="background:#f8fafc;border:1px solid #e8ecf0;border-radius:10px;padding:10px 16px;font-size:11px;color:#64748b;display:flex;gap:20px;flex-wrap:wrap">
+    html += `<div style="background:#f8fafc;border:1px solid #e8ecf0;border-radius:8px;padding:8px 14px;font-size:11px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap">
       <span style="font-weight:700;color:#475569">실인원 (중복제거)</span>
-      <span>교육생 <strong style="color:#1e40af">${ds.students ?? '-'}명</strong></span>
-      <span>수료인원 <strong style="color:#166534">${ds.graduates ?? '-'}명</strong></span>
+      <span>교육생 <strong style="color:#334155">${ds.students ?? '-'}명</strong></span>
+      <span>수료인원 <strong style="color:#334155">${ds.graduates ?? '-'}명</strong></span>
       <span style="color:#94a3b8">※ 한 명이 여러 교육 수강 시 건수는 중복 집계됩니다</span>
     </div>`;
   } else {
-    html += `<div class="tiles-row">
-      ${tile('당월 교육 참여 인원', (ds.students ?? '-') + '명', '실인원', 'blue')}
-      ${tile('당월 수료인원', (ds.graduates ?? '-') + '명', '실인원', 'green')}
-      ${tile('전체 교육', (ds.total_edu ?? '-') + '건', '신청 기준', 'gray')}
-      ${tile('수료 완료', (ds.completed ?? '-') + '건', '교육 기준', 'gray')}
-    </div>`;
+    html += `<div style="color:#94a3b8;font-size:13px;padding:16px 0">이달 교육 데이터가 없습니다</div>`;
   }
 
-  html += `<div class="tiles-row" style="margin-top:8px">
-      ${tile('당월 미수료해소건', mc + '건', '1회차 수강 누적', 'green')}
-    </div>
+  html += `<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e8ecf0;border-radius:8px;background:#fff">
+    <span style="font-size:12px;font-weight:700;color:#64748b">당월 미수료해소건</span>
+    <span style="font-size:20px;font-weight:900;color:#334155">${mc}건</span>
+    <span style="font-size:11px;color:#94a3b8">1회차 수강 누적</span>
+  </div>
   </div>`;
 
-  // 신규입사자 재직률 (인명부 연동 · 화이트벨트 기준)
-  html += `<div class="section-block">
-    <div class="section-label">신규입사자 재직률 <span class="sec-badge" style="background:#fef3c7;color:#92400e">화이트벨트 · 직전 3개월</span></div>`;
+  // 신규입사자 재직률 (막대 추세 + 스택바)
+  html += `<div class="section-block">`;
   if (!rr || rr.all_active === undefined) {
     html += `<div class="course-list"><div class="empty">인명부 데이터를 불러올 수 없습니다</div></div>`;
   } else {
-    const refMonths  = rr.ref_months || [];
-    const byMonth    = rr.by_month   || {};
-    const stab       = rr.stability  || {};
-    const stabTotal  = Object.values(stab).reduce((a,b) => a+b, 0);
-    const rate       = rr.rate;
-    const rateColor  = rate == null ? '#94a3b8' : rate >= 80 ? '#16a34a' : rate >= 60 ? '#d97706' : '#dc2626';
-    const mLabel = mk => `${parseInt(mk.split('-')[1])}월`;
+    const refMonths = rr.ref_months || [];
+    const byMonth   = rr.by_month   || {};
+    const stab      = rr.stability  || {};
+    const stabTotal = Object.values(stab).reduce((a,b) => a+b, 0);
+    const rate      = rr.rate;
+    const rateColor = rate == null ? '#64748b' : rate >= 80 ? '#166534' : rate >= 60 ? '#92400e' : '#991b1b';
+    const mLabel    = mk => `${parseInt(mk.split('-')[1])}월`;
 
-    // 재직률 큰 타일 + 월별 코호트
-    html += `<div style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;margin-bottom:14px">`;
-
-    html += `<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:18px 22px;display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:130px">
-      <div style="font-size:10px;font-weight:700;color:#7c3aed;letter-spacing:.5px;margin-bottom:4px">신규입사자 재직률</div>
-      <div style="font-size:48px;font-weight:900;color:${rateColor};line-height:1">${rate != null ? rate + '%' : '-'}</div>
-      <div style="font-size:10px;color:#94a3b8;margin-top:4px">${rr.active_cohort}명 재직 / ${rr.total_cohort}명 입사</div>
+    // 헤더: 제목 + 전체 재직률
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:800;color:#1a202c">신규입사자 재직률 <span style="font-size:11px;font-weight:400;color:#94a3b8">· 화이트벨트</span></div>
+      <div style="text-align:right">
+        <span style="font-size:30px;font-weight:900;color:${rateColor}">${rate != null ? rate + '%' : '-'}</span>
+        <span style="font-size:11px;color:#94a3b8;margin-left:6px">직전 3개월 · ${rr.active_cohort ?? 0}/${rr.total_cohort ?? 0}명</span>
+      </div>
     </div>`;
 
-    // 이번달 신규입사자 현황 박스
-    const curData  = rr.current_month_data || {};
-    const curMonth = rr.current_month || '';
-    const curLabel = curMonth ? parseInt(curMonth.split('-')[1]) + '월' : '-';
-    const curPct   = (curData.total ?? 0) > 0 ? Math.round((curData.active ?? 0) / curData.total * 100) : 100;
-    const curColor = curPct >= 80 ? '#16a34a' : curPct >= 60 ? '#d97706' : '#dc2626';
-    html += `<div style="flex:1;min-width:120px;background:#eff6ff;border:2px solid #93c5fd;border-radius:12px;padding:14px 16px">
-      <div style="font-size:10px;font-weight:700;color:#1d4ed8;margin-bottom:2px">이번 달</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:14px;font-weight:800;color:#1e40af">${curLabel} 입사</div>
-        <div style="font-size:10px;font-weight:700;color:#1d4ed8;background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:2px 7px">입사 ${curData.total ?? 0}명</div>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px">
-        <span style="font-size:30px;font-weight:900;color:${curColor};line-height:1">${curData.active ?? 0}</span>
-        <span style="font-size:12px;color:#94a3b8">명 재직</span>
-      </div>
-      <div style="font-size:10px;color:#64748b">${(curData.left || 0) > 0 ? `퇴사 <strong style="color:#dc2626">${curData.left}명</strong>` : '퇴사자 없음'}</div>
-    </div>`;
+    // 월별 막대 차트 ([M-3, M-2, M-1, 이번달])
+    const allRetMonths = [...[...refMonths].reverse(), rr.current_month].filter(Boolean);
+    const maxBarH = 80;
 
-    const mLabels = ['1개월 전', '2개월 전', '3개월 전'];
-    refMonths.forEach((mk, i) => {
-      const bm      = byMonth[mk] || {};
-      const total   = bm.total  ?? 0;
-      const active  = bm.active ?? 0;
-      const left    = bm.left   ?? 0;
-      const pct     = total > 0 ? Math.round(active / total * 100) : 100;
-      const pc      = pct >= 80 ? '#16a34a' : pct >= 60 ? '#d97706' : '#dc2626';
-      html += `<div style="flex:1;min-width:120px;background:#f8fafc;border:1px solid #e8ecf0;border-radius:12px;padding:14px 16px">
-        <div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:2px">${mLabels[i]}</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:14px;font-weight:800;color:#475569">${mLabel(mk)} 입사</div>
-          <div style="font-size:10px;font-weight:700;color:#7c3aed;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;padding:2px 7px">입사 ${total}명</div>
-        </div>
-        <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:4px">
-          <span style="font-size:30px;font-weight:900;color:${pc};line-height:1">${active}</span>
-          <span style="font-size:12px;color:#94a3b8">명 재직</span>
-        </div>
-        <div style="font-size:10px;color:#64748b">재직률 <strong style="color:${pc}">${pct}%</strong>${left > 0 ? ` · 퇴사 <strong style="color:#dc2626">${left}명</strong>` : ''}</div>
+    html += `<div style="display:flex;align-items:flex-end;gap:10px;height:${maxBarH + 28}px;margin-bottom:0">`;
+    allRetMonths.forEach(mk => {
+      const isCur = mk === rr.current_month;
+      const bm    = isCur ? (rr.current_month_data || {}) : (byMonth[mk] || {});
+      const tot   = bm.total  ?? 0;
+      const act   = bm.active ?? 0;
+      const pct   = tot > 0 ? Math.round(act / tot * 100) : null;
+      const isLow = pct != null && pct < 60;
+      const barBg = isCur ? '#1C3557' : isLow ? '#fef3c7' : '#d1d5db';
+      const barBd = isCur ? '#1C3557' : isLow ? '#d97706' : '#d1d5db';
+      const numC  = isCur ? '#1C3557' : isLow ? '#92400e' : '#64748b';
+      const barH  = pct != null ? Math.max(12, Math.round(pct / 100 * maxBarH)) : 12;
+      html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end">
+        <div style="font-size:12px;font-weight:800;color:${numC}">${pct != null ? pct + '%' : '-'}</div>
+        <div style="width:100%;height:${barH}px;background:${barBg};border:1px solid ${barBd};border-radius:4px 4px 0 0"></div>
       </div>`;
     });
     html += `</div>`;
 
-    // 근무안정도 (화이트벨트 재직자)
+    // 월 라벨
+    html += `<div style="display:flex;gap:10px;border-top:1px solid #e8ecf0;padding-top:5px;margin-bottom:10px">`;
+    allRetMonths.forEach(mk => {
+      const isCur = mk === rr.current_month;
+      html += `<div style="flex:1;text-align:center;font-size:11px;color:${isCur ? '#1C3557' : '#94a3b8'};font-weight:${isCur ? '700' : '400'}">${mLabel(mk)}</div>`;
+    });
+    html += `</div>`;
+
+    // 해석 주석
+    const curD  = rr.current_month_data || {};
+    const curMk = rr.current_month || '';
+    if (curMk) {
+      const curPctV = (curD.total ?? 0) > 0 ? Math.round((curD.active ?? 0) / curD.total * 100) : null;
+      const prevRatesArr = [...refMonths].reverse().map(mk => {
+        const bm = byMonth[mk] || {};
+        return bm.total > 0 ? Math.round(bm.active / bm.total * 100) : null;
+      }).filter(r => r != null);
+      const minPrev = prevRatesArr.length ? Math.min(...prevRatesArr) : null;
+      let note = '';
+      if ((curD.total ?? 0) > 0 && (curD.total ?? 0) <= 4) {
+        note = `${mLabel(curMk)} 코호트는 입사 초기라 이탈 관찰기간이 짧음(해석 주의).`;
+      } else if (minPrev != null && minPrev < 60) {
+        const minIdx = prevRatesArr.lastIndexOf(minPrev);
+        const minM = mLabel(([...refMonths].reverse())[minIdx] || curMk);
+        note = `${minM} 저점(${minPrev}%) 후 추이 지속 모니터링 필요.`;
+      }
+      if (note) html += `<div style="font-size:11px;color:#94a3b8;margin-bottom:12px">${note}</div>`;
+    }
+
+    // 근무안정도 (100% 스택바)
     if (stabTotal > 0) {
-      const bars = [
-        {label:'안정',   val:(stab['매우안정']||0)+(stab['안정']||0), color:'#16a34a', bg:'#f0fdf4', bc:'#bbf7d0'},
-        {label:'보통',   val:stab['보통']||0,                           color:'#d97706', bg:'#fffbeb', bc:'#fde68a'},
-        {label:'불안정', val:stab['불안정']||0,                         color:'#dc2626', bg:'#fff5f5', bc:'#fecaca'},
+      const stabSeg = [
+        { label:'안정',   val:(stab['매우안정']||0)+(stab['안정']||0), barBg:'#dcfce7', textColor:'#166534' },
+        { label:'보통',   val:stab['보통']||0,                           barBg:'#fef3c7', textColor:'#92400e' },
+        { label:'불안정', val:stab['불안정']||0,                         barBg:'#fee2e2', textColor:'#991b1b' },
+      ].filter(s => s.val > 0);
+      const legendAll = [
+        { label:'안정',   val:(stab['매우안정']||0)+(stab['안정']||0), dot:'#16a34a' },
+        { label:'보통',   val:stab['보통']||0,                           dot:'#d97706' },
+        { label:'불안정', val:stab['불안정']||0,                         dot:'#dc2626' },
       ];
-      html += `<div style="border:1px solid #e8ecf0;border-radius:10px;padding:14px 18px;background:#fafbfc">
-        <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase">
-          근무안정도 <span style="color:#94a3b8;font-weight:400;text-transform:none">화이트벨트 재직자 ${stabTotal}명 기준</span>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">`;
-      bars.forEach(b => {
-        const pct = stabTotal > 0 ? Math.round(b.val / stabTotal * 100) : 0;
-        html += `<div style="flex:1;min-width:110px;background:${b.bg};border:1px solid ${b.bc};border-radius:8px;padding:10px 14px">
-          <div style="font-size:10px;font-weight:700;color:${b.color}">${b.label}</div>
-          <div style="font-size:26px;font-weight:900;color:${b.color};line-height:1.2">${b.val}명</div>
-          <div style="font-size:11px;color:${b.color};opacity:.7">${pct}%</div>
+
+      html += `<div style="border-top:1px solid #f1f5f9;padding-top:12px">
+        <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px">근무안정도 <span style="font-weight:400;color:#94a3b8">· 재직자 ${stabTotal}명 기준</span></div>
+        <div style="display:flex;height:34px;border-radius:6px;overflow:hidden;margin-bottom:8px">`;
+      stabSeg.forEach(s => {
+        const pct = Math.round(s.val / stabTotal * 100);
+        html += `<div style="flex:${pct};background:${s.barBg};display:flex;align-items:center;justify-content:center;min-width:0">
+          ${pct >= 18 ? `<span style="font-size:12px;font-weight:700;color:${s.textColor};white-space:nowrap">${s.label} ${s.val}명·${pct}%</span>` : ''}
+        </div>`;
+      });
+      html += `</div><div style="display:flex;gap:14px;flex-wrap:wrap">`;
+      legendAll.forEach(s => {
+        const pct = stabTotal > 0 ? Math.round(s.val / stabTotal * 100) : 0;
+        html += `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748b">
+          <div style="width:8px;height:8px;border-radius:2px;background:${s.dot}"></div>${s.label} ${pct}%
         </div>`;
       });
       html += `</div></div>`;
@@ -696,7 +703,7 @@ function render(data) {
     const retBg   = retRate   == null ? '#faf5ff' : retRate   >= 80 ? '#f0fdf4' : retRate   >= 60 ? '#fffbeb' : '#fff5f5';
     const retBd   = retRate   == null ? '#e9d5ff' : retRate   >= 80 ? '#bbf7d0' : retRate   >= 60 ? '#fde68a' : '#fecaca';
     const kpis = [
-      { label:'미수료해소건', val: latest.completion != null ? latest.completion+'건' : '-', sub:'이달 1회차 수강 완료', subColor:'#94a3b8', bg:'#f0fdf4', border:'#bbf7d0', valColor:'#16a34a' },
+      { label:'미수료해소건', val: latest.completion != null ? latest.completion+'건' : '-', sub:'이달 1회차 수강 완료', subColor:'#94a3b8', bg:'#fff', border:'#e8ecf0', valColor:'#334155' },
       { label:'재교육 필요 비율', val: latest.re_edu_ratio != null ? latest.re_edu_ratio+'%' : '-', sub:'70점 미만 평가', subColor:'#94a3b8', bg:reEduBg, border:reEduBd, valColor: reEduColor },
       { label:'신규 정착률', val: latest.retention_rate != null ? latest.retention_rate+'%' : '-', sub:'화이트벨트 기준', subColor:'#94a3b8', bg:retBg, border:retBd, valColor: retColor },
     ];
