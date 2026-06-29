@@ -173,6 +173,9 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
 .irr-input { width: 100%; border: none; background: transparent; font-family: inherit; font-size: 13px; color: #1a202c; outline: none; padding: 3px 4px; border-radius: 4px; }
 .irr-input:focus { background: #eff6ff; }
 .irr-input::placeholder { color: #cbd5e1; }
+.irr-textarea { resize: none; min-height: 36px; overflow: hidden; line-height: 1.5; white-space: pre-wrap; }
+.irr-date { font-size: 11px; padding: 3px 2px; cursor: pointer; }
+.irr-content-view { font-size: 13px; color: #1a202c; white-space: pre-wrap; word-break: break-word; line-height: 1.6; padding: 2px 0; }
 .irr-status-sel { border: 1px solid #e8ecf0; border-radius: 6px; font-size: 11px; font-weight: 700; padding: 4px 6px; cursor: pointer; outline: none; font-family: inherit; width: 100%; }
 .irr-del { background: #fee2e2; border: none; border-radius: 6px; color: #dc2626; font-size: 11px; font-weight: 700; padding: 5px 10px; cursor: pointer; font-family: inherit; white-space: nowrap; }
 .irr-del:hover { background: #fca5a5; }
@@ -1002,6 +1005,35 @@ function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function parsePeriodDate(period, which) {
+  if (!period) return '';
+  const parts = String(period).split('~');
+  let raw = (which === 'start' ? parts[0] : parts[1] || '').trim();
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const md = raw.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (md) {
+    const y = new Date().getFullYear();
+    return `${y}-${md[1].padStart(2,'0')}-${md[2].padStart(2,'0')}`;
+  }
+  return '';
+}
+
+function formatPeriodFromInputs(idx) {
+  const row = document.querySelector(`[data-irr="${idx}"]`);
+  if (!row) return;
+  const s = row.querySelector('.irr-ds').value;
+  const e = row.querySelector('.irr-de').value;
+  const fmt = v => { if (!v) return ''; const [,m,d] = v.split('-'); return `${parseInt(m)}/${parseInt(d)}`; };
+  const period = [fmt(s), fmt(e)].filter(Boolean).join('~');
+  irrUpdate(idx, 'period', period);
+}
+
+function autoResizeTA(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
 function renderIrregular() {
   const rows = _irrRows;
   const card = document.getElementById('irregularCard');
@@ -1038,17 +1070,24 @@ function renderIrregular() {
     rows.forEach((r, i) => {
       const sc = IRR_COLOR[r.status] || '#1a202c';
       const sb = IRR_BG[r.status]    || '#f1f5f9';
+      const ds = parsePeriodDate(r.period, 'start');
+      const de = parsePeriodDate(r.period, 'end');
       if (isAdmin) {
         const opts = IRR_STATUS.map(s =>
           `<option value="${s}"${s === r.status ? ' selected' : ''}>${s}</option>`
         ).join('');
-        html += `<tr>
-          <td><input class="irr-input" value="${esc(r.name)}"    placeholder="업무명"    onchange="irrUpdate(${i},'name',this.value)"></td>
-          <td><input class="irr-input" value="${esc(r.content)}" placeholder="내용"      onchange="irrUpdate(${i},'content',this.value)"></td>
-          <td><input class="irr-input" value="${esc(r.period)}"  placeholder="예) 6/24~7/1" onchange="irrUpdate(${i},'period',this.value)"></td>
+        html += `<tr data-irr="${i}">
+          <td><input class="irr-input" value="${esc(r.name)}" placeholder="업무명" onchange="irrUpdate(${i},'name',this.value)"></td>
+          <td><textarea class="irr-input irr-textarea" placeholder="세부 내용" oninput="autoResizeTA(this)" onchange="irrUpdate(${i},'content',this.value)">${esc(r.content)}</textarea></td>
           <td>
-            <select class="irr-status-sel" style="color:${sc};background:${sb};border-color:${sc}40"
-              onchange="irrStatusChange(${i},this.value)">
+            <div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">
+              <input type="date" class="irr-input irr-date irr-ds" value="${ds}" onchange="formatPeriodFromInputs(${i})" style="flex:1;min-width:110px">
+              <span style="color:#94a3b8;font-size:11px;flex-shrink:0">~</span>
+              <input type="date" class="irr-input irr-date irr-de" value="${de}" onchange="formatPeriodFromInputs(${i})" style="flex:1;min-width:110px">
+            </div>
+          </td>
+          <td>
+            <select class="irr-status-sel" style="color:${sc};background:${sb};border-color:${sc}40" onchange="irrStatusChange(${i},this.value)">
               ${opts}
             </select>
           </td>
@@ -1058,7 +1097,7 @@ function renderIrregular() {
       } else {
         html += `<tr>
           <td>${esc(r.name)}</td>
-          <td>${esc(r.content)}</td>
+          <td><div class="irr-content-view">${esc(r.content)}</div></td>
           <td>${esc(r.period)}</td>
           <td><span style="color:${sc};background:${sb};border:1px solid ${sc}40;border-radius:4px;padding:2px 8px;font-size:12px">${esc(r.status)}</span></td>
           <td>${esc(r.note)}</td>
@@ -1073,6 +1112,7 @@ function renderIrregular() {
   html += `</div></div>`;
 
   card.innerHTML = html;
+  card.querySelectorAll('.irr-textarea').forEach(ta => autoResizeTA(ta));
 }
 
 // 초기화
