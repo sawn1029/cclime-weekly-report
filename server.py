@@ -828,7 +828,15 @@ def collect_all(week_start_str=None):
         except Exception:
             pass
 
-    cancelled = cancelled_trash + main_list_cancelled
+    # 폐강 교육도 선택한 주간 기간에 해당하는 것만 포함
+    def _in_week(c):
+        try:
+            sd = date.fromisoformat(c.get('startDate', ''))
+            return week_start <= sd <= week_end
+        except Exception:
+            return False
+
+    cancelled = [c for c in (cancelled_trash + main_list_cancelled) if _in_week(c)]
     recent.sort(key=lambda x: x['startDate'], reverse=True)
 
     # 이번 주 교육 학생 수·수료 수
