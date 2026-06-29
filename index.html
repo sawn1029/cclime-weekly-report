@@ -545,8 +545,10 @@ function render(data) {
         </div>
       </div>`;
     });
-    if (ds.students || ds.graduates) {
-      html += `<div style="padding-top:8px;font-size:11px;color:#94a3b8;border-top:1px solid #f1f5f9">실인원(중복제거) · 교육생 <strong style="color:#64748b">${ds.students ?? '-'}명</strong> · 수료 <strong style="color:#64748b">${ds.graduates ?? '-'}명</strong></div>`;
+    const totalEnrolled = allTypes.reduce((s, t) => s + (mts[t]?.enrolled || 0), 0);
+    const totalAttended = allTypes.reduce((s, t) => s + (mts[t]?.attended || 0), 0);
+    if (totalEnrolled > 0) {
+      html += `<div style="padding-top:8px;font-size:11px;color:#94a3b8;border-top:1px solid #f1f5f9">이달 합계 · 교육생 <strong style="color:#64748b">${totalEnrolled}명</strong> · 수료인원 <strong style="color:#64748b">${totalAttended}명</strong></div>`;
     }
   } else {
     html += `<div style="color:#94a3b8;font-size:13px;padding:16px 0">이달 교육 데이터가 없습니다</div>`;
