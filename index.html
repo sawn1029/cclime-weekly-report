@@ -995,7 +995,7 @@ async function irrUpdate(idx, field, val) {
   await irrPost({ action: 'update', idx, field, val });
 }
 async function irrStatusChange(idx, val) { await irrPost({ action: 'update', idx, field: 'status', val }); }
-async function irrAdd() { await irrPost({ action: 'add', task: { name:'', content:'', period:'', status:'진행중', note:'' } }); }
+async function irrAdd(week) { await irrPost({ action: 'add', task: { name:'', content:'', period:'', status:'진행중', note:'', week: week || '이번주' } }); }
 async function irrDel(idx) {
   if (!confirm('이 항목을 삭제하시겠습니까?')) return;
   await irrPost({ action: 'delete', idx });
@@ -1053,62 +1053,73 @@ function renderIrregular() {
     </div>
     <div class="card-body">`;
 
-  if (!rows.length) {
-    html += `<div class="irr-empty">${isAdmin ? '아래 버튼을 눌러 업무를 추가하세요' : '등록된 업무가 없습니다'}</div>`;
-  } else {
-    html += `<div style="overflow-x:auto"><div class="irr-wrap"><table class="irr-table">
-      <thead><tr>
-        <th style="width:22%">업무명</th>
-        <th style="width:30%">세부 내용</th>
-        <th style="width:14%">기간</th>
-        <th style="width:10%">상태</th>
-        <th>비고</th>
-        ${isAdmin ? '<th style="width:50px;text-align:center"></th>' : ''}
-      </tr></thead>
-      <tbody>`;
-
-    rows.forEach((r, i) => {
-      const sc = IRR_COLOR[r.status] || '#1a202c';
-      const sb = IRR_BG[r.status]    || '#f1f5f9';
-      const ds = parsePeriodDate(r.period, 'start');
-      const de = parsePeriodDate(r.period, 'end');
-      if (isAdmin) {
-        const opts = IRR_STATUS.map(s =>
-          `<option value="${s}"${s === r.status ? ' selected' : ''}>${s}</option>`
-        ).join('');
-        html += `<tr data-irr="${i}">
-          <td><input class="irr-input" value="${esc(r.name)}" placeholder="업무명" onchange="irrUpdate(${i},'name',this.value)"></td>
-          <td><textarea class="irr-input irr-textarea" placeholder="세부 내용" oninput="autoResizeTA(this)" onchange="irrUpdate(${i},'content',this.value)">${esc(r.content)}</textarea></td>
-          <td>
-            <div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">
-              <input type="date" class="irr-input irr-date irr-ds" value="${ds}" onchange="formatPeriodFromInputs(${i})" style="flex:1;min-width:110px">
-              <span style="color:#94a3b8;font-size:11px;flex-shrink:0">~</span>
-              <input type="date" class="irr-input irr-date irr-de" value="${de}" onchange="formatPeriodFromInputs(${i})" style="flex:1;min-width:110px">
-            </div>
-          </td>
-          <td>
-            <select class="irr-status-sel" style="color:${sc};background:${sb};border-color:${sc}40" onchange="irrStatusChange(${i},this.value)">
-              ${opts}
-            </select>
-          </td>
-          <td><input class="irr-input" value="${esc(r.note)}" placeholder="비고" onchange="irrUpdate(${i},'note',this.value)"></td>
-          <td style="text-align:center"><button class="irr-del" onclick="irrDel(${i})">삭제</button></td>
-        </tr>`;
-      } else {
-        html += `<tr>
-          <td>${esc(r.name)}</td>
-          <td><div class="irr-content-view">${esc(r.content)}</div></td>
-          <td>${esc(r.period)}</td>
-          <td><span style="color:${sc};background:${sb};border:1px solid ${sc}40;border-radius:4px;padding:2px 8px;font-size:12px">${esc(r.status)}</span></td>
-          <td>${esc(r.note)}</td>
-        </tr>`;
-      }
-    });
-
-    html += `</tbody></table></div></div>`;
+  function irrTable(group, label, weekKey) {
+    let s = `<div style="margin-bottom:${weekKey==='이번주'?'20px':'0'}">
+      <div style="font-size:11px;font-weight:800;color:#475569;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${weekKey==='이번주'?'#1C3557':'#d97706'}"></span>
+        ${label}
+        <span style="font-size:10px;font-weight:400;color:#94a3b8">${group.length}건</span>
+      </div>`;
+    if (!group.length) {
+      s += `<div style="padding:14px 18px;border:1px dashed #e8ecf0;border-radius:8px;text-align:center;color:#94a3b8;font-size:13px">${isAdmin ? '아래 버튼으로 추가하세요' : '내역 없음'}</div>`;
+    } else {
+      s += `<div style="overflow-x:auto"><div class="irr-wrap"><table class="irr-table">
+        <thead><tr>
+          <th style="width:20%">업무명</th>
+          <th style="width:28%">세부 내용</th>
+          <th style="width:16%">기간</th>
+          <th style="width:10%">상태</th>
+          <th>비고</th>
+          ${isAdmin ? '<th style="width:50px;text-align:center"></th>' : ''}
+        </tr></thead><tbody>`;
+      group.forEach(({ r, i }) => {
+        const sc = IRR_COLOR[r.status] || '#1a202c';
+        const sb = IRR_BG[r.status]    || '#f1f5f9';
+        const ds = parsePeriodDate(r.period, 'start');
+        const de = parsePeriodDate(r.period, 'end');
+        if (isAdmin) {
+          const opts = IRR_STATUS.map(st =>
+            `<option value="${st}"${st === r.status ? ' selected' : ''}>${st}</option>`
+          ).join('');
+          s += `<tr data-irr="${i}">
+            <td><input class="irr-input" value="${esc(r.name)}" placeholder="업무명" onchange="irrUpdate(${i},'name',this.value)"></td>
+            <td><textarea class="irr-input irr-textarea" placeholder="세부 내용" oninput="autoResizeTA(this)" onchange="irrUpdate(${i},'content',this.value)">${esc(r.content)}</textarea></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">
+                <input type="date" class="irr-input irr-date irr-ds" value="${ds}" onchange="formatPeriodFromInputs(${i})" style="flex:1;min-width:110px">
+                <span style="color:#94a3b8;font-size:11px;flex-shrink:0">~</span>
+                <input type="date" class="irr-input irr-date irr-de" value="${de}" onchange="formatPeriodFromInputs(${i})" style="flex:1;min-width:110px">
+              </div>
+            </td>
+            <td>
+              <select class="irr-status-sel" style="color:${sc};background:${sb};border-color:${sc}40" onchange="irrStatusChange(${i},this.value)">${opts}</select>
+            </td>
+            <td><input class="irr-input" value="${esc(r.note)}" placeholder="비고" onchange="irrUpdate(${i},'note',this.value)"></td>
+            <td style="text-align:center"><button class="irr-del" onclick="irrDel(${i})">삭제</button></td>
+          </tr>`;
+        } else {
+          s += `<tr>
+            <td>${esc(r.name)}</td>
+            <td><div class="irr-content-view">${esc(r.content)}</div></td>
+            <td>${esc(r.period)}</td>
+            <td><span style="color:${sc};background:${sb};border:1px solid ${sc}40;border-radius:4px;padding:2px 8px;font-size:12px">${esc(r.status)}</span></td>
+            <td>${esc(r.note)}</td>
+          </tr>`;
+        }
+      });
+      s += `</tbody></table></div></div>`;
+    }
+    if (isAdmin) s += `<button class="btn-add-row" onclick="irrAdd('${weekKey}')" style="margin-top:6px">＋ ${label} 추가</button>`;
+    s += `</div>`;
+    return s;
   }
 
-  if (isAdmin) html += `<button class="btn-add-row" onclick="irrAdd()">＋ 업무 추가</button>`;
+  const thisWeek = rows.map((r,i)=>({r,i})).filter(({r})=>(r.week||'이번주')==='이번주');
+  const nextWeek = rows.map((r,i)=>({r,i})).filter(({r})=>r.week==='다음주');
+
+  html += irrTable(thisWeek, '이번 주 진행 내역', '이번주');
+  html += `<div style="border-top:1px solid #f1f5f9;margin-bottom:16px"></div>`;
+  html += irrTable(nextWeek, '다음 주 예정 내역', '다음주');
   html += `</div></div>`;
 
   card.innerHTML = html;
